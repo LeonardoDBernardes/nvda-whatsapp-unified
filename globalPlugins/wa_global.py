@@ -18,6 +18,7 @@ import ui
 import winUser
 import treeInterceptorHandler
 import time
+from scriptHandler import script
 
 addonHandler.initTranslation()
 
@@ -169,6 +170,24 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 ti = getattr(obj, "treeInterceptor", None)
                 if ti and hasattr(ti, "passThrough") and not ti.passThrough:
                     ti.passThrough = True
+
+    @script(description=_("Fechar conversa (WhatsApp Web)"), gesture="kb:escape")
+    def script_escape(self, gesture):
+        """No WhatsApp Web: manda Escape ao browser (fecha conversa/modal).
+        Fora do WhatsApp Web: replica o comportamento padrão do NVDA (sair do modo foco)."""
+        if self._in_whatsapp_web:
+            gesture.send()
+            return
+        # Comportamento padrão NVDA: sai do modo foco se estiver nele
+        try:
+            obj = api.getFocusObject()
+            ti = getattr(obj, "treeInterceptor", None)
+            if ti and hasattr(ti, "passThrough") and ti.passThrough:
+                ti.passThrough = False
+                return
+        except Exception:
+            pass
+        gesture.send()
 
     def event_liveRegionChange(self, obj, nextHandler):
         """Anuncia live regions do WhatsApp Web imediatamente, sem o delay polite.
