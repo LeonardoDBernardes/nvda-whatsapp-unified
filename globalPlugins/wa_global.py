@@ -141,6 +141,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             return nextHandler()
         text = obj.name or obj.description or ""
         text = text.strip()
+        # Chama nextHandler para preservar o gerenciamento de foco do NVDA,
+        # depois cancela a fala agendada e anuncia imediatamente
+        nextHandler()
         if text:
+            speech.cancelSpeech()
             speech.speakText(text, reason=controlTypes.OutputReason.CHANGE)
-        # Não chama nextHandler: evita o segundo anúncio com delay do NVDA
