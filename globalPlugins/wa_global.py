@@ -17,6 +17,7 @@ import speech
 import ui
 import winUser
 import treeInterceptorHandler
+import time
 
 addonHandler.initTranslation()
 
@@ -123,8 +124,11 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         "chrome", "msedge", "firefox", "opera", "brave", "vivaldi", "iexplore"
     })
 
-    # Cache: evita traversal pesado no event_liveRegionChange
+    # Cache: estado WhatsApp Web e controle de throttle para live regions
     _in_whatsapp_web = False
+    _last_lr_text    = ""
+    _last_lr_time    = 0.0
+    _LR_MIN_INTERVAL = 0.35  # segundos mínimos entre anúncios de live region
 
     def _check_whatsapp_web(self, obj):
         """Verifica se obj está num browser com WhatsApp Web aberto.
@@ -167,11 +171,18 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                     ti.passThrough = True
 
     def event_liveRegionChange(self, obj, nextHandler):
-        """Anuncia live regions do WhatsApp Web imediatamente, sem o delay polite."""
+        """Anuncia live regions do WhatsApp Web imediatamente, sem o delay polite.
+        Throttling e deduplicação evitam saturar o NVDA com atualizações rápidas."""
         if not self._in_whatsapp_web:
             return nextHandler()
-        text = obj.name or obj.description or ""
-        text = text.strip()
-        if text:
-            ui.message(text)
+        text = (obj.name or obj.description or "").strip()
+        if not text:
+            return
+        now = time.monotonic()
+        # Descarta: mesmo texto repetido OU intervalo menor que o mínimo
+        if text == self._last_lr_text and (now - self._last_lr_time) < self._LR_MIN_INTERVAL:
+            return
+        self._last_lr_text = text
+        self._last_lr_time = now
+        ui.message(text)
         # Não chama nextHandler: evita o anúncio duplicado com delay de 500ms
