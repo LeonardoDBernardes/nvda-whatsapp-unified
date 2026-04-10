@@ -11,6 +11,9 @@ import config
 import gui
 import wx
 from gui.settingsDialogs import SettingsPanel, NVDASettingsDialog
+import api
+import controlTypes
+import speech
 
 addonHandler.initTranslation()
 
@@ -102,3 +105,42 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         if WhatsAppUnifiedSettings in NVDASettingsDialog.categoryClasses:
             NVDASettingsDialog.categoryClasses.remove(WhatsAppUnifiedSettings)
         super().terminate()
+
+    # ── WhatsApp Web — live region sem delay ──────────────────────────────────
+
+    _BROWSER_EXES = frozenset({
+        "chrome", "msedge", "firefox", "opera", "brave", "vivaldi", "iexplore"
+    })
+
+    def _is_whatsapp_web(self, obj):
+        """Retorna True se obj pertence a uma aba de WhatsApp Web num browser."""
+        scope = config.conf.get(CONFIG_SECTION, {}).get("scope", "desktop")
+        if scope == "desktop":
+            return False
+        try:
+            appName = obj.appModule.appName.lower().replace(".exe", "")
+            if appName not in self._BROWSER_EXES:
+                return False
+            # Sobe na árvore até encontrar o documento raiz e verificar o título
+            node = obj
+            for _ in range(20):
+                if node.role == controlTypes.Role.DOCUMENT:
+                    title = (node.name or "").lower()
+                    return "whatsapp" in title
+                parent = node.parent
+                if parent is None or parent == node:
+                    break
+                node = parent
+        except Exception:
+            pass
+        return False
+
+    def event_liveRegionChange(self, obj, nextHandler):
+        """Intercepta live regions do WhatsApp Web e anuncia sem o delay polite."""
+        if not self._is_whatsapp_web(obj):
+            return nextHandler()
+        text = obj.name or obj.description or ""
+        text = text.strip()
+        if text:
+            speech.speakText(text, reason=controlTypes.OutputReason.CHANGE)
+        # Não chama nextHandler: evita o segundo anúncio com delay do NVDA
