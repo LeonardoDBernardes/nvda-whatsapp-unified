@@ -14,6 +14,8 @@ from gui.settingsDialogs import SettingsPanel, NVDASettingsDialog
 import api
 import controlTypes
 import speech
+import ui
+import winUser
 
 addonHandler.initTranslation()
 
@@ -106,14 +108,18 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             NVDASettingsDialog.categoryClasses.remove(WhatsAppUnifiedSettings)
         super().terminate()
 
-    # ── WhatsApp Web — live region sem delay ──────────────────────────────────
+    # ── WhatsApp Web — foco e live region sem delay ───────────────────────────
 
     _BROWSER_EXES = frozenset({
         "chrome", "msedge", "firefox", "opera", "brave", "vivaldi", "iexplore"
     })
 
-    def _is_whatsapp_web(self, obj):
-        """Retorna True se obj pertence a uma aba de WhatsApp Web num browser."""
+    # Cache: evita traversal pesado no event_liveRegionChange
+    _in_whatsapp_web = False
+
+    def _check_whatsapp_web(self, obj):
+        """Verifica se obj está num browser com WhatsApp Web aberto.
+        Usa título da janela em primeiro plano — mais rápido que traversal de árvore."""
         scope = config.conf.get(CONFIG_SECTION, {}).get("scope", "desktop")
         if scope == "desktop":
             return False
@@ -121,29 +127,28 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             appName = obj.appModule.appName.lower().replace(".exe", "")
             if appName not in self._BROWSER_EXES:
                 return False
-            # Sobe na árvore até encontrar o documento raiz e verificar o título
-            node = obj
-            for _ in range(20):
-                if node.role == controlTypes.Role.DOCUMENT:
-                    title = (node.name or "").lower()
-                    return "whatsapp" in title
-                parent = node.parent
-                if parent is None or parent == node:
-                    break
-                node = parent
+            hwnd = winUser.getForegroundWindow()
+            title = winUser.getWindowText(hwnd).lower()
+            return "whatsapp" in title
         except Exception:
-            pass
-        return False
+            return False
+
+    def event_gainFocus(self, obj, nextHandler):
+        """Atualiza cache e força modo foco quando o WhatsApp Web está ativo."""
+        nextHandler()
+        self._in_whatsapp_web = self._check_whatsapp_web(obj)
+        if self._in_whatsapp_web:
+            if config.conf.get(CONFIG_SECTION, {}).get("autoFocusMode", True):
+                ti = getattr(obj, "treeInterceptor", None)
+                if ti and hasattr(ti, "passThrough") and not ti.passThrough:
+                    ti.passThrough = True
 
     def event_liveRegionChange(self, obj, nextHandler):
-        """Intercepta live regions do WhatsApp Web e anuncia sem o delay polite."""
-        if not self._is_whatsapp_web(obj):
+        """Anuncia live regions do WhatsApp Web imediatamente, sem o delay polite."""
+        if not self._in_whatsapp_web:
             return nextHandler()
         text = obj.name or obj.description or ""
         text = text.strip()
-        # Chama nextHandler para preservar o gerenciamento de foco do NVDA,
-        # depois cancela a fala agendada e anuncia imediatamente
-        nextHandler()
         if text:
-            speech.cancelSpeech()
-            speech.speakText(text, reason=controlTypes.OutputReason.CHANGE)
+            ui.message(text)
+        # Não chama nextHandler: evita o anúncio duplicado com delay de 500ms
