@@ -16,6 +16,7 @@ import controlTypes
 import speech
 import ui
 import winUser
+import treeInterceptorHandler
 
 addonHandler.initTranslation()
 
@@ -100,12 +101,20 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         appModuleHandler.registerExecutableWithAppModule("WhatsApp", "whatsapp_root")
         appModuleHandler.registerExecutableWithAppModule("WhatsApp.Root", "whatsapp_root")
         NVDASettingsDialog.categoryClasses.append(WhatsAppUnifiedSettings)
+        # Monitora mudanças de modo browse para forçar foco no WhatsApp Web
+        treeInterceptorHandler.post_browseModeStateChange.register(
+            self._on_browse_mode_change)
 
     def terminate(self):
         appModuleHandler.unregisterExecutable("WhatsApp")
         appModuleHandler.unregisterExecutable("WhatsApp.Root")
         if WhatsAppUnifiedSettings in NVDASettingsDialog.categoryClasses:
             NVDASettingsDialog.categoryClasses.remove(WhatsAppUnifiedSettings)
+        try:
+            treeInterceptorHandler.post_browseModeStateChange.unregister(
+                self._on_browse_mode_change)
+        except Exception:
+            pass
         super().terminate()
 
     # ── WhatsApp Web — foco e live region sem delay ───────────────────────────
@@ -132,6 +141,20 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             return "whatsapp" in title
         except Exception:
             return False
+
+    def _on_browse_mode_change(self, **kwargs):
+        """Reforça modo foco sempre que o NVDA tenta sair dele no WhatsApp Web."""
+        if not self._in_whatsapp_web:
+            return
+        if not config.conf.get(CONFIG_SECTION, {}).get("autoFocusMode", True):
+            return
+        try:
+            focus = api.getFocusObject()
+            ti = getattr(focus, "treeInterceptor", None)
+            if ti and hasattr(ti, "passThrough") and not ti.passThrough:
+                ti.passThrough = True
+        except Exception:
+            pass
 
     def event_gainFocus(self, obj, nextHandler):
         """Atualiza cache e força modo foco quando o WhatsApp Web está ativo."""
