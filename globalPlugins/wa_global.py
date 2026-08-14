@@ -18,6 +18,7 @@ import ui
 import winUser
 import time
 from scriptHandler import script
+from NVDAObjects.IAccessible import IAccessible
 from NVDAObjects.IAccessible.ia2Web import Ia2Web
 
 addonHandler.initTranslation()
@@ -191,8 +192,17 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         # _in_whatsapp_web, que pode ainda não ter sido atualizado pro objeto
         # atual nesse ponto do ciclo do NVDA) — só rotula item de menu (papel
         # MENUITEM) quando a checagem de URL bate com WhatsApp Web de verdade.
+        # MessageMenuItemNav herda de Ia2Web (família IAccessible/IA2) — só
+        # pode ser aplicada quando o próprio Chrome expôs esse item via IA2.
+        # Achado real (S342r/14-08): às vezes o Chrome expõe o mesmo menu via
+        # UIA em vez de IA2 (classe tipo "ChromiumUIAMenuItemUIA" no clsList)
+        # — misturar as duas famílias gera um objeto quebrado, sem atributos
+        # básicos (event_objectID/IAccessibleChildID), travando o event pump
+        # do NVDA repetidamente. Só aplica se já existir base IAccessible.
         try:
-            if obj.role == controlTypes.Role.MENUITEM and self._check_whatsapp_web(obj):
+            if (obj.role == controlTypes.Role.MENUITEM
+                    and any(issubclass(c, IAccessible) for c in clsList)
+                    and self._check_whatsapp_web(obj)):
                 clsList.insert(0, MessageMenuItemNav)
         except Exception:
             pass
@@ -295,7 +305,18 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             if c.get("autoFocusMode", True) and not c.get("disableFocusLock", False):
                 ti = getattr(obj, "treeInterceptor", None)
                 if ti and hasattr(ti, "passThrough"):
-                    ti.passThrough = True
+                    try:
+                        ti.passThrough = True
+                    except Exception:
+                        # Achado real (S342r/14-08): setar passThrough aqui
+                        # dentro do próprio evento de foco às vezes esbarra
+                        # num objeto de revisão ainda não pronto (NoneType
+                        # sem makeTextInfo) e derruba o evento inteiro,
+                        # cortando o resto do processamento daquele foco no
+                        # meio. Como isso é reforçado a cada troca de foco
+                        # (comentário acima), ignorar aqui e deixar a próxima
+                        # troca de foco tentar de novo é seguro.
+                        pass
 
     @script(description=_("Alternar modo de navegação (WhatsApp Web)"), gesture="kb:NVDA+space")
     def script_toggleBrowseModeWeb(self, gesture):
