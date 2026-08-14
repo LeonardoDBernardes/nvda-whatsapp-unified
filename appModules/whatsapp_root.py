@@ -17,11 +17,16 @@ Atalhos herdados do whatsAppNG:
 
 Atalhos herdados do whatsAppEnhancer:
   Alt+C              — Abrir mensagem em janela de texto
-  Shift+Alt+C        — Menu de chamada
+  Shift+Alt+C        — Menu de chamada (Seta cima/baixo navega, Ctrl+Enter ativa)
   NVDA+Setas         — Revisar o último texto falado
   Ctrl+Shift+E       — Alternar filtro de números de telefone
   NVDA+Space         — Alternar modo de navegação
   NVDA+Shift+I       — Inspecionar elemento (desenvolvimento)
+
+Navegação virtual de menu (CallMenuDialog/HeaderMenuDialog, herdada do
+whatsAppEnhancer): contorna o bug documentado do NVDA com botões que abrem
+menu (issue #7836) amarrando Seta cima/baixo/Ctrl+Enter só ao objeto do menu
+via chooseNVDAObjectOverlayClasses — nunca ao teclado inteiro.
 """
 
 import appModuleHandler
@@ -32,9 +37,9 @@ import config
 import re
 import wx
 import controlTypes
-import treeInterceptorHandler
 import addonHandler
 from scriptHandler import script
+from NVDAObjects.IAccessible.ia2Web import Ia2Web
 
 addonHandler.initTranslation()
 
@@ -46,6 +51,7 @@ SPEC = {
     "filterUsageHints":   "boolean(default=True)",
     "filterTalvez":       "boolean(default=True)",
     "autoFocusMode":      "boolean(default=True)",
+    "disableFocusLock":   "boolean(default=False)",
 }
 
 PHONE_RE = re.compile(r"\+\d[()\d\s-]{8,15}(?=[^\d]|$|\s)")
@@ -170,6 +176,159 @@ def _find_first_button(obj):
     return None
 
 
+# ─── Navegação virtual de menu (herdado do whatsAppEnhancer) ──────────────────
+# O NVDA tem um bug documentado (issue #7836) com botões que abrem menu: a
+# primeira seta funciona dentro do menu, as seguintes escorregam sozinhas pro
+# modo de navegação sem avisar, e passam a mover o cursor do NVDA pela janela
+# inteira em vez de andar no menu. A técnica SEGURA (diferente da tentativa
+# que quebrou navegação em outras páginas no lado Web — nunca repetir aquele
+# erro) é usar `chooseNVDAObjectOverlayClasses` do NVDA: isso amarra Up/Down/
+# Ctrl+Enter só ao objeto específico do menu quando ele ganha foco, nunca ao
+# teclado inteiro do Windows.
+class _MenuNavBase(Ia2Web):
+    _v_idx = -1
+    _items_cache = None
+
+    def _collect_items(self):
+        raise NotImplementedError
+
+    def _get_items(self):
+        if self._items_cache:
+            return self._items_cache
+        self._items_cache = self._collect_items()
+        return self._items_cache
+
+    def _announce(self, items):
+        if not items or self._v_idx < 0:
+            return
+        obj = items[self._v_idx]
+        name = obj.name
+        if not name:
+            sub = _collect(obj, lambda o: bool(o.name), max_items=20)
+            name = " ".join(s.name for s in sub if s.name)
+        state_list = []
+        for s_name in ("CHECKED", "SELECTED", "PRESSED", "ON"):
+            s_val = getattr(controlTypes.State, s_name, None)
+            if s_val and s_val in obj.states:
+                state_list.append(controlTypes.stateLabels[s_val])
+        full_msg = name or _("Opção")
+        if state_list:
+            full_msg += f" ({', '.join(state_list)})"
+        ui.message(full_msg)
+
+    def script_next(self, gesture):
+        items = self._get_items()
+        if not items:
+            gesture.send()
+            return
+        self._v_idx = (self._v_idx + 1) % len(items)
+        self._announce(items)
+
+    def script_prev(self, gesture):
+        items = self._get_items()
+        if not items:
+            gesture.send()
+            return
+        self._v_idx = (self._v_idx - 1) % len(items)
+        self._announce(items)
+
+    def script_activate(self, gesture):
+        items = self._get_items()
+        if items and 0 <= self._v_idx < len(items):
+            target = items[self._v_idx]
+            try:
+                target.doAction()
+            except Exception:
+                try:
+                    target.click()
+                except Exception:
+                    gesture.send()
+        else:
+            gesture.send()
+
+    def event_loseFocus(self):
+        self._items_cache = None
+        self._v_idx = -1
+
+    __gestures = {
+        "kb:downArrow": "next",
+        "kb:upArrow": "prev",
+        "kb:control+enter": "activate",
+    }
+
+
+class CallMenuDialog(_MenuNavBase):
+    """Menu de chamada (Shift+Alt+C) — junta os itens de dentro do próprio objeto."""
+
+    def _collect_items(self):
+        items = []
+        stack = [self]
+        visited = 0
+        while stack and visited < 200:
+            o = stack.pop()
+            visited += 1
+            if o is not self:
+                is_item = _role(o) in (controlTypes.Role.BUTTON, controlTypes.Role.LISTITEM)
+                cls = getattr(o, "IA2Attributes", {}).get("class", "")
+                if "xjb2p0i" in cls or "xk390pu" in cls or "_ahkm" in cls:
+                    is_item = True
+                if is_item:
+                    name = o.name
+                    if not name:
+                        sub = _collect(o, lambda x: bool(x.name), max_items=10)
+                        name = " ".join(s.name for s in sub if s.name)
+                    if name and name.strip():
+                        items.append(o)
+                        continue
+            try:
+                child = o.lastChild
+                while child:
+                    stack.append(child)
+                    child = child.previous
+            except Exception:
+                pass
+        return items
+
+
+class HeaderMenuDialog(_MenuNavBase):
+    """Menu do cabeçalho da conversa ("..." do topo, config de grupo etc.)."""
+
+    def _collect_items(self):
+        root = self
+        while root and root.parent and _role(root) != controlTypes.Role.WINDOW:
+            loc = root.location
+            if loc and loc.width > 300 and loc.height > 300:
+                break
+            root = root.parent
+        items = []
+        stack = [root]
+        visited = 0
+        while stack and visited < 300:
+            o = stack.pop()
+            visited += 1
+            if o is not root:
+                is_target = _role(o) in (controlTypes.Role.BUTTON, controlTypes.Role.LISTITEM)
+                if (not is_target and _role(o) == controlTypes.Role.STATICTEXT
+                        and o.name and len(o.name.strip()) > 1):
+                    is_target = True
+                if is_target:
+                    name = o.name
+                    if not name:
+                        sub = _collect(o, lambda x: bool(x.name), max_items=10)
+                        name = " ".join(s.name for s in sub if s.name)
+                    if name and name.strip():
+                        items.append(o)
+                        continue
+            try:
+                child = o.lastChild
+                while child:
+                    stack.append(child)
+                    child = child.previous
+            except Exception:
+                pass
+        return items
+
+
 # ─── App Module ────────────────────────────────────────────────────────────────
 class AppModule(appModuleHandler.AppModule):
 
@@ -195,18 +354,21 @@ class AppModule(appModuleHandler.AppModule):
         self._is_reviewing = False
         self._original_speak = None
         self._patch_speech()
-        # Auto focus mode (herdado do whatsAppNG)
-        treeInterceptorHandler.post_browseModeStateChange.register(
-            self._on_browse_mode_change)
 
     def terminate(self):
         self._unpatch_speech()
-        try:
-            treeInterceptorHandler.post_browseModeStateChange.unregister(
-                self._on_browse_mode_change)
-        except Exception:
-            pass
         super().terminate()
+
+    def chooseNVDAObjectOverlayClasses(self, obj, clsList):
+        cls = getattr(obj, "IA2Attributes", {}).get("class", "")
+        if "x1c4vz4f" in cls and "x1nhvcw1" in cls:
+            clsList.insert(0, CallMenuDialog)
+        if "xyi3aci" in cls and "xe2zdcy" in cls:
+            clsList.insert(0, HeaderMenuDialog)
+        if "xuwfzo9" in cls and obj.parent:
+            p_cls = getattr(obj.parent, "IA2Attributes", {}).get("class", "")
+            if "xyi3aci" in p_cls:
+                clsList.insert(0, HeaderMenuDialog)
 
     def _load_config(self):
         if CONFIG_SECTION not in config.conf:
@@ -220,6 +382,7 @@ class AppModule(appModuleHandler.AppModule):
             "filterUsageHints": True,
             "filterTalvez": True,
             "autoFocusMode": True,
+            "disableFocusLock": False,
         }
         for k, dv in bool_keys.items():
             raw = section.get(k)
@@ -231,18 +394,18 @@ class AppModule(appModuleHandler.AppModule):
                 self._cfg[k] = str(raw).lower() == "true"
 
     # ── Browse mode ─────────────────────────────────────────────────────────────
-    def _on_browse_mode_change(self, **kwargs):
-        if not self._cfg.get("autoFocusMode", True):
-            return
-        try:
-            focus = api.getFocusObject()
-            app = getattr(focus, "appModule", None)
-            if app and getattr(app, "processID", None) == self.processID:
-                ti = getattr(focus, "treeInterceptor", None)
-                if ti:
-                    ti.passThrough = True
-        except Exception:
-            pass
+    # Só força modo foco ao ENTRAR no WhatsApp vindo de outro programa (evento de
+    # primeiro plano) — nunca de forma reativa a cada troca de foco interna, pra
+    # não brigar com o Escape nativo do NVDA nem com NVDA+Espaço enquanto o
+    # usuário está navegando (isso causava a necessidade de "Enter e depois Esc"
+    # pra abrir submenus, e travava a navegação por palavra com Ctrl+setas).
+    def event_foreground(self, obj, nextHandler):
+        if (self._cfg.get("autoFocusMode", True)
+                and not self._cfg.get("disableFocusLock", False)):
+            ti = getattr(obj, "treeInterceptor", None)
+            if ti:
+                ti.passThrough = True
+        nextHandler()
 
     def event_gainFocus(self, obj, nextHandler):
         if not self.mainWindow or not getattr(self.mainWindow, "windowHandle", None):
@@ -252,7 +415,20 @@ class AppModule(appModuleHandler.AppModule):
                     self.mainWindow = curr
                     break
                 curr = curr.parent
-        if self._cfg.get("autoFocusMode", True):
+
+        # Andar ENTRE itens de lista (conversas OU mensagens) é tratado pelo
+        # próprio JavaScript do WhatsApp (seleção do item) — precisa ficar
+        # sempre em modo foco pra as setas chegarem cruas na página, então
+        # reforça a cada troca de foco quando o item ganhando foco é uma
+        # SECTION/UNKNOWN (linha da lista de conversas OU linha de mensagem).
+        # Só NÃO reforça quando o foco entra num elemento aninhado dentro de
+        # uma mensagem (botão de reagir, reproduzir, baixar, submenu — role
+        # diferente de 86/29/UNKNOWN) — aí sim precisa da liberdade do modo
+        # de navegação pra explorar (Escape/NVDA+Espaço/Ctrl+setas).
+        obj_role = _role(obj)
+        is_list_item = obj_role in (86, 29) or obj_role == controlTypes.Role.UNKNOWN
+        if (is_list_item and self._cfg.get("autoFocusMode", True)
+                and not self._cfg.get("disableFocusLock", False)):
             ti = getattr(obj, "treeInterceptor", None)
             if ti:
                 ti.passThrough = True
@@ -978,12 +1154,26 @@ class AppModule(appModuleHandler.AppModule):
     def script_toggleBrowseMode(self, gesture):
         obj = api.getFocusObject()
         ti = getattr(obj, "treeInterceptor", None)
-        if ti:
+        if not ti:
+            gesture.send()
+            return
+        try:
+            import globalCommands
+            core_toggle = getattr(
+                globalCommands.commands, "script_toggleVirtualBufferPassThrough", None)
+        except Exception:
+            core_toggle = None
+        if core_toggle:
+            # Usa o comando nativo do NVDA (sincroniza cursor de revisão e
+            # anuncia o modo corretamente) em vez de só inverter o atributo.
+            # Nada mais no addon reverte essa escolha depois — só o evento de
+            # primeiro plano (entrar no WhatsApp de novo) e o Alt+D forçam
+            # modo foco de propósito.
+            core_toggle(gesture)
+        else:
             ti.passThrough = not ti.passThrough
             state = _("Modo foco") if ti.passThrough else _("Modo de navegação")
             ui.message(state)
-        else:
-            gesture.send()
 
     # ── Inspetor ────────────────────────────────────────────────────────────────
     @script(description=_("Inspecionar elemento"), gesture="kb:NVDA+shift+i")
