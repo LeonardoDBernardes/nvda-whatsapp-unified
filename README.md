@@ -122,6 +122,46 @@ Registro Windows `UserDuckingPreference=3` aplicado — Windows não mais abaixa
 
 ## Changelog
 
+### 1.3.0 (2026-10-22) — Escopo separado (app / web) e correções que valem nos dois lados
+Esta versão nasceu da análise feita com o REA no WhatsApp Desktop e no WhatsApp Web
+(relatório em `~/rea-analises/whatsapp/relatorio.md`). O achado principal: o app do
+Windows não tem interface própria — ele abre o mesmo `web.whatsapp.com` dentro de uma
+janela WebView2. Por isso o que funciona num lado funciona no outro, e o que atrapalha
+também.
+
+**1. O "Aplicar para" agora funciona de verdade.** Antes o módulo do aplicativo lia a
+opção de escopo e não fazia nada com ela — por isso algumas coisas funcionavam no app e
+outras no web, mesmo com a opção marcada. Agora:
+- `Apenas aplicativo (Desktop)`: o plugin global não mexe em nada dentro do navegador;
+  o módulo do aplicativo trabalha normalmente.
+- `Apenas WhatsApp Web (navegador)`: o módulo do aplicativo não altera nada (não força
+  modo foco, não filtra nome de objeto e todos os atalhos dele apenas repassam a tecla); o
+  plugin global trabalha no navegador.
+- `Ambos`: os dois lados trabalham (padrão).
+
+**2. Registro do executável em minúsculas.** O NVDA guarda o nome do executável em
+minúsculas e o registro anterior (`"WhatsApp"`, `"WhatsApp.Root"`) não batia — o módulo
+só carregava por sorte, pelo caminho alternativo de trocar ponto por sublinhado. Agora
+está `"whatsapp"` e `"whatsapp.root"`.
+
+**3. Dica de uso real.** A frase que o WhatsApp fala hoje é "Para acessar o menu e
+encontrar mais opções, pressione a tecla de seta para a esquerda ou direita". Ela não
+estava na lista e por isso continuava sendo lida depois da mensagem. Incluída, junto
+com as variantes em outros idiomas.
+
+**4. Filtros passaram a valer no WhatsApp Web.** O plugin global não tinha o tratamento
+de nome de objeto (`event_NVDAObject_init`), então as caixas "filtrar números", "dica de
+uso" e "remover Talvez" apareciam nas configurações mas não faziam nada no navegador.
+Agora fazem — com a mesma regra do app: telefone na lista de conversas só é filtrado se
+a caixa da lista de conversas estiver marcada, e na lista de mensagens só se a caixa das
+mensagens estiver marcada.
+
+**5. Ir para a lista de conversas / de mensagens.** A detecção de qual lista é qual
+deixou de depender só da posição na tela (coluna da esquerda, largura pequena) e passou a
+usar primeiro o nome que o próprio WhatsApp publica ("Lista de conversas", "Mensagens"),
+em LIST ou TABLE — a lista de conversas hoje é publicada como grade. A regra por posição
+ficou só como reserva.
+
 ### 1.2.19 (2026-08-14) — Web: desfeita a 1.2.18, corrigido pela raiz
 **O Leo apontou:** a navegação própria por `setFocus()` entre botões-irmãos (1.2.18) não
 resolveu nada — "a mesma coisa ainda". Pediu pra analisar de novo o que o Desktop faz de
@@ -401,6 +441,6 @@ with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as z:
 
 ---
 
-## Versão atual: 1.2.19
+## Versão atual: 1.3.0
 Criado em: 2026-04-05
 Autor: Leo (baseado em mrido1 e Nuno Costa)

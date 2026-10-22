@@ -4,6 +4,8 @@ WhatsApp Unified — plugin global.
 Registra o executável e painel de configurações.
 """
 
+import re
+
 import globalPluginHandler
 import appModuleHandler
 import addonHandler
@@ -32,8 +34,27 @@ SPEC = {
     "filterTalvez":         "boolean(default=True)",
     "autoFocusMode":        "boolean(default=True)",
     "disableFocusLock":     "boolean(default=False)",
-    "scope":                "string(default='desktop')",
+    "scope":                "string(default='both')",
 }
+
+# Mesmas expressões usadas pelo módulo do aplicativo, para o WhatsApp Web não
+# ficar sem os filtros (o README registrava "as opções aparecem mas não fazem
+# nada no Web"). A frase real da dica em português começa com "Para acessar o
+# menu" e não estava em nenhuma lista antes.
+_HINT_RE = re.compile(
+    r"(Para acessar o menu|Para acessar as opções|Para mais opções|"
+    r"To access the menu|For more options|"
+    r"Para acceder al menú|Para más opciones|"
+    r"Pour accéder au menu|Pour plus|"
+    r"Um weitere Optionen|Für weitere|"
+    r"Per accedere al menù|Per altre|"
+    r"Untuk membuka menu|Untuk opsi|"
+    r"Untuk mengakses menu|Para lebih|"
+    r"Daha fazla|Voor meer|"
+    r"Для получения|Để biết|สำหรับ|その他|更多选项|अधिक|추가 옵션)",
+    re.IGNORECASE,
+)
+_PHONE_RE = re.compile(r"\+\d[()\d\s-]{8,15}(?=[^\d]|$|\s)")
 
 SCOPE_CHOICES = [
     ("desktop", _("Apenas aplicativo (Desktop)")),
@@ -124,7 +145,7 @@ class WhatsAppUnifiedSettings(SettingsPanel):
             wx.Choice,
             choices=scope_labels,
         )
-        current_scope = c.get("scope", "desktop")
+        current_scope = c.get("scope", "both")
         scope_keys = [key for key, _ in SCOPE_CHOICES]
         idx = scope_keys.index(current_scope) if current_scope in scope_keys else 0
         self.scope.SetSelection(idx)
@@ -176,13 +197,15 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         config.conf.spec[CONFIG_SECTION] = SPEC
         if CONFIG_SECTION not in config.conf:
             config.conf[CONFIG_SECTION] = {}
-        appModuleHandler.registerExecutableWithAppModule("WhatsApp", "whatsapp_root")
-        appModuleHandler.registerExecutableWithAppModule("WhatsApp.Root", "whatsapp_root")
+        # O NVDA guarda o nome do executável em minúsculas: "WhatsApp.Root.exe"
+        # vira "whatsapp.root". Com maiúsculas o registro nunca casava.
+        appModuleHandler.registerExecutableWithAppModule("whatsapp", "whatsapp_root")
+        appModuleHandler.registerExecutableWithAppModule("whatsapp.root", "whatsapp_root")
         NVDASettingsDialog.categoryClasses.append(WhatsAppUnifiedSettings)
 
     def terminate(self):
-        appModuleHandler.unregisterExecutable("WhatsApp")
-        appModuleHandler.unregisterExecutable("WhatsApp.Root")
+        appModuleHandler.unregisterExecutable("whatsapp")
+        appModuleHandler.unregisterExecutable("whatsapp.root")
         if WhatsAppUnifiedSettings in NVDASettingsDialog.categoryClasses:
             NVDASettingsDialog.categoryClasses.remove(WhatsAppUnifiedSettings)
         super().terminate()
@@ -264,6 +287,103 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             return "whatsapp" in title
         except Exception:
             return False
+
+    # ── Filtros do WhatsApp Web ───────────────────────────────────────────────
+    # Antes existiam só no módulo do aplicativo; no navegador as opções
+    # apareciam nas configurações e não faziam nada.
+
+    def _looks_like_whatsapp_web(self, obj):
+        """Checagem para o evento de criação de objeto: usa o cache do foco e,
+        quando ele ainda não foi preenchido, confere o endereço do documento
+        ou o título da janela em primeiro plano."""
+        scope = config.conf.get(CONFIG_SECTION, {}).get("scope", "both")
+        if scope == "desktop":
+            return False
+        if self._in_whatsapp_web:
+            return True
+        try:
+            ti = getattr(obj, "treeInterceptor", None)
+            url = (getattr(ti, "documentConstantIdentifier", None)
+                   or getattr(ti, "documentUrl", None)) if ti else None
+            if url and "web.whatsapp.com" in str(url).lower():
+                return True
+        except Exception:
+            pass
+        try:
+            return "whatsapp" in winUser.getWindowText(
+                winUser.getForegroundWindow()).lower()
+        except Exception:
+            return False
+
+    def _list_kind(self, obj):
+        """Diz se o objeto está na lista de conversas ou na de mensagens pelo
+        rótulo acessível dela ('Lista de conversas', 'Mensagens' etc.).
+        Devolve 'chat', 'message' ou None."""
+        curr = obj
+        for _ in range(10):
+            try:
+                name = (curr.name or "").lower()
+            except Exception:
+                name = ""
+            if re.search(r"conversa|conversation|\bchats?\b", name):
+                return "chat"
+            if re.search(r"mensage|message", name):
+                return "message"
+            try:
+                curr = curr.parent
+            except Exception:
+                return None
+            if curr is None:
+                return None
+        return None
+
+    def event_NVDAObject_init(self, obj):
+        """Aplica no WhatsApp Web os mesmos filtros do aplicativo: dica de uso,
+        'Talvez' e números de telefone."""
+        try:
+            app_name = obj.appModule.appName.lower().replace(".exe", "")
+        except Exception:
+            return
+        if app_name not in self._BROWSER_EXES:
+            return
+        if not self._looks_like_whatsapp_web(obj):
+            return
+        try:
+            name = obj.name
+        except Exception:
+            return
+        if not name:
+            return
+        c = config.conf.get(CONFIG_SECTION, {})
+        role = getattr(obj, "role", None)
+        new = name
+
+        # Dica de uso longa ("Para acessar o menu e encontrar mais opções...").
+        if c.get("filterUsageHints", True):
+            m = _HINT_RE.search(new)
+            if m and (m.start() == 0 or role in (
+                    86, 29, controlTypes.Role.UNKNOWN)):
+                new = new[:m.start()]
+
+        # "Talvez" antes do nome do contato (número não salvo na agenda).
+        if c.get("filterTalvez", True):
+            stripped = new.lstrip()
+            if stripped.startswith("Talvez "):
+                new = stripped[7:]
+
+        # Números de telefone, separados por lista.
+        if _PHONE_RE.search(new):
+            kind = self._list_kind(obj)
+            if ((kind == "chat" and c.get("filterChatList", False))
+                    or (kind == "message"
+                        and c.get("filterMessageList", True))):
+                new = _PHONE_RE.sub("", new)
+
+        if new != name:
+            try:
+                obj.name = re.sub(r"\s{2,}", " ", new).strip()
+            except Exception:
+                pass
 
     # Modo foco automático em duas velocidades, dependendo de ONDE o foco está:
     # - Andar ENTRE itens de lista (conversas OU mensagens, role 86/29/UNKNOWN
@@ -362,9 +482,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
                 f"E:{loc.left} T:{loc.top} L:{loc.width} A:{loc.height}"
                 if loc else "sem posição")
             cls = getattr(obj, "IA2Attributes", {}).get("class", "")[:60]
-            role = controlTypes.roleLabels.get(obj.role, str(obj.role))
+            role = getattr(obj.role, "displayString", str(obj.role))
             states = ", ".join(
-                controlTypes.stateLabels.get(s, str(s))
+                getattr(s, "displayString", str(s))
                 for s in getattr(obj, "states", set()))
             ui.message(
                 f"Papel:{role} | {loc_str} | Nome:'{(obj.name or '')[:50]}' | "

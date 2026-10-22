@@ -29,6 +29,8 @@ menu (issue #7836) amarrando Seta cima/baixo/Ctrl+Enter só ao objeto do menu
 via chooseNVDAObjectOverlayClasses — nunca ao teclado inteiro.
 """
 
+import functools
+
 import appModuleHandler
 import api
 import ui
@@ -58,8 +60,15 @@ PHONE_RE = re.compile(r"\+\d[()\d\s-]{8,15}(?=[^\d]|$|\s)")
 TALVEZ_RE = re.compile(r"\bTalvez\b\s*", re.IGNORECASE)
 DURATION_RE = re.compile(r"\b\d+:\d{2}\b")
 USAGE_HINT_RE = re.compile(
-    r"(For more options|Para mais opções|Para más opciones|Pour plus|"
-    r"Für weitere|Per altre|Untuk opsi|Para lebih|Daha fazla|Voor meer|"
+    r"(Para acessar o menu|Para acessar as opções|Para mais opções|"
+    r"To access the menu|For more options|"
+    r"Para acceder al menú|Para más opciones|"
+    r"Pour accéder au menu|Pour plus|"
+    r"Um weitere Optionen|Für weitere|"
+    r"Per accedere al menù|Per altre|"
+    r"Untuk membuka menu|Untuk opsi|"
+    r"Untuk mengakses menu|Para lebih|"
+    r"Daha fazla|Voor meer|"
     r"Для получения|Để biết|สำหรับ|その他|更多选项|अधिक|추가 옵션)",
     re.IGNORECASE,
 )
@@ -210,7 +219,7 @@ class _MenuNavBase(Ia2Web):
         for s_name in ("CHECKED", "SELECTED", "PRESSED", "ON"):
             s_val = getattr(controlTypes.State, s_name, None)
             if s_val and s_val in obj.states:
-                state_list.append(controlTypes.stateLabels[s_val])
+                state_list.append(getattr(s_val, "displayString", str(s_val)))
         full_msg = name or _("Opção")
         if state_list:
             full_msg += f" ({', '.join(state_list)})"
@@ -346,6 +355,8 @@ class AppModule(appModuleHandler.AppModule):
         self._toggling = False
         self._cfg = {}
         self._load_config()
+        # Em "Apenas WhatsApp Web" o módulo do aplicativo não altera nada.
+        self.disableBrowseModeByDefault = self._app_enabled()
         # Revisão de texto (herdado do whatsAppEnhancer)
         self._last_spoken_text = ""
         self._last_spoken_lines = []
@@ -359,7 +370,19 @@ class AppModule(appModuleHandler.AppModule):
         self._unpatch_speech()
         super().terminate()
 
+    def _app_enabled(self):
+        """Lê o escopo na hora (dá para trocar nas configurações sem reiniciar
+        o NVDA). 'web' = o módulo do aplicativo não age; 'desktop' e 'both' =
+        age normalmente."""
+        try:
+            return config.conf.get(
+                CONFIG_SECTION, {}).get("scope", "both") != "web"
+        except Exception:
+            return True
+
     def chooseNVDAObjectOverlayClasses(self, obj, clsList):
+        if not self._app_enabled():
+            return
         cls = getattr(obj, "IA2Attributes", {}).get("class", "")
         if "x1c4vz4f" in cls and "x1nhvcw1" in cls:
             clsList.insert(0, CallMenuDialog)
@@ -400,6 +423,9 @@ class AppModule(appModuleHandler.AppModule):
     # usuário está navegando (isso causava a necessidade de "Enter e depois Esc"
     # pra abrir submenus, e travava a navegação por palavra com Ctrl+setas).
     def event_foreground(self, obj, nextHandler):
+        if not self._app_enabled():
+            nextHandler()
+            return
         if (self._cfg.get("autoFocusMode", True)
                 and not self._cfg.get("disableFocusLock", False)):
             ti = getattr(obj, "treeInterceptor", None)
@@ -408,6 +434,9 @@ class AppModule(appModuleHandler.AppModule):
         nextHandler()
 
     def event_gainFocus(self, obj, nextHandler):
+        if not self._app_enabled():
+            nextHandler()
+            return
         if not self.mainWindow or not getattr(self.mainWindow, "windowHandle", None):
             curr = obj
             while curr:
@@ -437,6 +466,8 @@ class AppModule(appModuleHandler.AppModule):
 
     # ── Filtros de objetos ───────────────────────────────────────────────────────
     def event_NVDAObject_init(self, obj):
+        if not self._app_enabled():
+            return
         if self._toggling:
             return
         try:
@@ -549,6 +580,8 @@ class AppModule(appModuleHandler.AppModule):
         return False
 
     def _is_message_list(self):
+        if not self._app_enabled():
+            return False
         try:
             focus = api.getFocusObject()
             r = _role(focus)
@@ -663,9 +696,19 @@ class AppModule(appModuleHandler.AppModule):
                             return
                     except Exception:
                         pass
-            lists = _collect(root, lambda o: o.role == controlTypes.Role.LIST)
-            candidates = [l for l in lists
-                          if l.location and l.location.left < 450 and l.location.width < 500]
+            # A página de hoje expõe a lista de conversas como grade
+            # ("Lista de conversas"); versões antigas usavam lista. Aceita as
+            # duas e escolhe primeiro pelo rótulo — que não depende de zoom,
+            # tamanho de tela nem idioma —, com a posição em pixels apenas
+            # como reserva.
+            lists = _collect(root, lambda o: _role(o) in (
+                controlTypes.Role.LIST, controlTypes.Role.TABLE))
+            named = [l for l in lists
+                     if re.search(r"conversa|conversation|\bchats?\b",
+                                  l.name or "", re.I)]
+            candidates = named or [
+                l for l in lists
+                if l.location and l.location.left < 450 and l.location.width < 500]
             if candidates:
                 t = candidates[0]
                 self._chats_cache = t
@@ -713,11 +756,19 @@ class AppModule(appModuleHandler.AppModule):
                             return
                     except Exception:
                         pass
-            lists = _collect(root, lambda o: o.role == controlTypes.Role.LIST)
-            for l in lists:
+            lists = _collect(root, lambda o: _role(o) in (
+                controlTypes.Role.LIST, controlTypes.Role.TABLE))
+            # Primeiro pelo rótulo da lista ("Mensagens"), depois pela classe
+            # dos itens (focusable-list-item), que é a reserva antiga.
+            named = [l for l in lists
+                     if re.search(r"mensage|message", l.name or "", re.I)]
+            restantes = [l for l in lists
+                         if not any(l is n for n in named)]
+            for l in named + restantes:
                 fc = l.firstChild
-                if fc and "focusable-list-item" in getattr(
-                        fc, "IA2Attributes", {}).get("class", ""):
+                if (any(l is n for n in named)) or (
+                        fc and "focusable-list-item" in getattr(
+                            fc, "IA2Attributes", {}).get("class", "")):
                     self._message_list_cache = l
                     target = l.lastChild or l
                     target.setFocus()
@@ -1186,3 +1237,24 @@ class AppModule(appModuleHandler.AppModule):
         cls = getattr(obj, "IA2Attributes", {}).get("class", "")[:40]
         role = controlTypes.roleLabels.get(obj.role, str(obj.role))
         ui.message(f"Papel:{role} | {loc_str} | Nome:'{(obj.name or '')[:50]}' | Classe:{cls}")
+
+
+# ─── Escopo "Apenas WhatsApp Web" ─────────────────────────────────────────────
+# Em vez de repetir a checagem em cada um dos atalhos, embrulha todos os scripts
+# do módulo: fora do escopo, a tecla é repassada à página em vez de executar a
+# ação do aplicativo. A leitura da configuração é feita na hora da tecla, então
+# trocar o escopo nas configurações vale sem reiniciar o NVDA.
+def _guard_scope(fn):
+    @functools.wraps(fn)
+    def wrapper(self, gesture):
+        if not self._app_enabled():
+            gesture.send()
+            return None
+        return fn(self, gesture)
+    return wrapper
+
+
+for _name, _fn in list(AppModule.__dict__.items()):
+    if _name.startswith("script_") and callable(_fn):
+        setattr(AppModule, _name, _guard_scope(_fn))
+del _name, _fn
