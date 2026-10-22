@@ -98,6 +98,11 @@ sobre por que isso é arriscado sem inspecionar ao vivo).
 | Ctrl+Shift+E | Alternar filtro de números de telefone |
 | NVDA+Space | Alternar modo de navegação |
 | NVDA+Shift+I | Inspecionar elemento (debug) |
+| Alt+P | Pausar ou retomar o áudio da mensagem em foco |
+| Ctrl+S | Aumentar ou diminuir a velocidade do áudio da mensagem |
+
+As duas teclas de áudio só agem quando a mensagem em foco tem um player (mensagem de voz ou
+vídeo). Fora disso a tecla segue o caminho normal do Windows, sem travar nada.
 
 ### Proteção de navegação
 - Seta esquerda na lista de conversas → redireciona para cima (evita entrar em botões inline)
@@ -121,6 +126,51 @@ Registro Windows `UserDuckingPreference=3` aplicado — Windows não mais abaixa
 ---
 
 ## Changelog
+
+### 1.4.0 (2026-10-22) — Robusto contra versões novas, controle de áudio e licença
+
+Esta versão é a resposta à análise dos outros seis addons de WhatsApp da loja do NVDA. O
+objetivo não foi copiar a lista de recursos deles, e sim tirar do nosso o tipo de coisa que
+quebra sozinha quando o WhatsApp ou o NVDA mudam de versão.
+
+**1. Herda o módulo nativo do NVDA.** Desde o NVDA 2026.2 existe um módulo de WhatsApp
+dentro do próprio NVDA. Antes o nosso substituía esse módulo por inteiro; agora ele herda
+dele e só acrescenta o que interessa. Quando o NVDA corrigir ou mudar algo no módulo
+nativo, a correção chega junto, sem precisar refazer nada aqui.
+
+**2. Menus deixaram de depender de nome de classe do WhatsApp.** A navegação por setas nos
+menus (chamada, cabeçalho, contexto) usava nomes de classe internos do WhatsApp, que mudam
+a cada versão. Agora o reconhecimento é por tipo de objeto (menu, menu suspenso) e por
+atributo de acessibilidade (`xml-roles`), com os nomes de classe antigos apenas como
+reserva. Se o reconhecimento errar para mais, nada trava: a seta volta a fazer o que fazia
+antes.
+
+**3. Estado do menu virou de cada objeto.** Antes a posição e a lista de itens ficavam
+guardadas na classe, então dois menus abertos ao mesmo tempo dividiam a mesma posição.
+Agora cada menu tem o seu estado.
+
+**4. Fim dos números mágicos.** Os valores numéricos fixos de estado (512 = recolhido,
+16777216 = focável) e a tabela antiga de nomes de função deram lugar à API atual do NVDA.
+Se um valor deixar de existir numa versão futura, o código se adapta em vez de quebrar.
+
+**5. Leitura de mensagem longa ("ler mais") deixou de ser falsa espera.** Antes o código
+abria o "ler mais" e esperava um tempo fixo de 120 ms sem nada acontecer. Agora ele abre,
+espera de verdade o texto novo chegar e só então fala. Também ficou mais simples copiar
+(Ctrl+C), ler completa (Ctrl+R) e abrir em janela (Alt+C): os três partem da mesma leitura
+do texto. O Ctrl+C copia só o que está visível, de propósito; o Ctrl+R e o Alt+C abrem o
+"ler mais" quando a mensagem está cortada. Se o WhatsApp demorar mais de 1,2 segundo para
+expandir, o que estiver visível é falado.
+
+**6. Controle de áudio (pedido de paridade com o WhatsAppPlus).**
+- **Alt+P** pausa ou retoma o áudio da mensagem em foco.
+- **Ctrl+S** aumenta ou diminui a velocidade do áudio.
+As duas só agem quando existe um player na mensagem; fora disso a tecla segue o caminho
+normal, então não atrapalham nada.
+
+**7. Licença em ordem.** O addon é GPL-2 (era exigência dos dois addons de origem). O
+arquivo `COPYING` agora está no repositório e os créditos estão na seção "Licença e
+créditos". O `manifest.ini` não ganhou campo de licença porque esse campo não existe no
+padrão de addon do NVDA.
 
 ### 1.3.0 (2026-10-22) — Escopo separado (app / web) e correções que valem nos dois lados
 Esta versão nasceu da análise feita com o REA no WhatsApp Desktop e no WhatsApp Web
@@ -423,6 +473,34 @@ revertido pelo watchdog).
 
 ---
 
+---
+
+## Licença e créditos
+
+Este addon é **GPL versão 2** (GNU General Public License v2). O texto completo está no
+arquivo `COPYING`, na raiz do repositório. Em resumo:
+
+1. Você pode usar, estudar, copiar e modificar o addon livremente.
+2. Se você distribuir uma versão modificada, ela também precisa ser GPL-2 e precisa manter
+   os créditos abaixo.
+3. O addon é distribuído sem garantia, como manda a própria GPL.
+
+A licença GPL-2 é obrigatória aqui porque o código deriva de dois addons que já usavam essa
+licença. Não é uma escolha nova — é a condição para poder usar o que eles escreveram.
+
+Créditos:
+
+1. **mrido1** — autor do `whatsAppEnhancer`, origem da janela de texto, do inspetor de
+   elemento, da revisão de último texto falado e do filtro de números.
+2. **Nuno Costa** — autor do `whatsAppNG`, origem da navegação (Alt+1/2/D), copiar, ler
+   mensagem completa, modo de navegação, reagir e menu de contexto.
+3. **Leo** — unificação, escopo app/web, correções de robustez, controle de áudio e a
+   documentação em português.
+
+Se o repositório for publicado, o arquivo `COPYING` precisa ir junto.
+
+---
+
 ## Como versionar / renomear
 
 O nome interno do addon está em `manifest.ini` (campo `name`) e em `wa_global.py` (registro do executável). Para renomear:
@@ -446,6 +524,6 @@ with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as z:
 
 ---
 
-## Versão atual: 1.3.0
+## Versão atual: 1.4.0
 Criado em: 2026-04-05
 Autor: Leo (baseado em mrido1 e Nuno Costa)

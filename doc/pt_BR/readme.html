@@ -442,8 +442,19 @@ whatsAppEnhancer)</h3>
 <td>NVDA+Shift+I</td>
 <td>Inspecionar elemento (debug)</td>
 </tr>
+<tr class="odd">
+<td>Alt+P</td>
+<td>Pausar ou retomar o áudio da mensagem em foco</td>
+</tr>
+<tr class="even">
+<td>Ctrl+S</td>
+<td>Aumentar ou diminuir a velocidade do áudio da mensagem</td>
+</tr>
 </tbody>
 </table>
+<p>As duas teclas de áudio só agem quando a mensagem em foco tem um
+player (mensagem de voz ou vídeo). Fora disso a tecla segue o caminho
+normal do Windows, sem travar nada.</p>
 <h3 id="proteção-de-navegação">Proteção de navegação</h3>
 <ul>
 <li>Seta esquerda na lista de conversas → redireciona para cima (evita
@@ -471,6 +482,60 @@ outros sons quando o NVDA fala.</p>
 Windows não mais abaixa o NVDA durante chamadas VoIP.</p>
 <hr />
 <h2 id="changelog">Changelog</h2>
+<h3
+id="robusto-contra-versões-novas-controle-de-áudio-e-licença">1.4.0
+(2026-10-22) — Robusto contra versões novas, controle de áudio e
+licença</h3>
+<p>Esta versão é a resposta à análise dos outros seis addons de
+WhatsApp da loja do NVDA. O objetivo não foi copiar a lista de recursos
+deles, e sim tirar do nosso o tipo de coisa que quebra sozinha quando o
+WhatsApp ou o NVDA mudam de versão.</p>
+<p><strong>1. Herda o módulo nativo do NVDA.</strong> Desde o NVDA
+2026.2 existe um módulo de WhatsApp dentro do próprio NVDA. Antes o
+nosso substituía esse módulo por inteiro; agora ele herda dele e só
+acrescenta o que interessa. Quando o NVDA corrigir ou mudar algo no
+módulo nativo, a correção chega junto, sem precisar refazer nada
+aqui.</p>
+<p><strong>2. Menus deixaram de depender de nome de classe do
+WhatsApp.</strong> A navegação por setas nos menus (chamada, cabeçalho,
+contexto) usava nomes de classe internos do WhatsApp, que mudam a cada
+versão. Agora o reconhecimento é por tipo de objeto (menu, menu
+suspenso) e por atributo de acessibilidade
+(<code>xml-roles</code>), com os nomes de classe antigos apenas como
+reserva. Se o reconhecimento errar para mais, nada trava: a seta volta a
+fazer o que fazia antes.</p>
+<p><strong>3. Estado do menu virou de cada objeto.</strong> Antes a
+posição e a lista de itens ficavam guardadas na classe, então dois menus
+abertos ao mesmo tempo dividiam a mesma posição. Agora cada menu tem o
+seu estado.</p>
+<p><strong>4. Fim dos números mágicos.</strong> Os valores numéricos
+fixos de estado (512 = recolhido, 16777216 = focável) e a tabela antiga
+de nomes de função deram lugar à API atual do NVDA. Se um valor deixar
+de existir numa versão futura, o código se adapta em vez de
+quebrar.</p>
+<p><strong>5. Leitura de mensagem longa (“ler mais”) deixou de ser falsa
+espera.</strong> Antes o código abria o “ler mais” e esperava um tempo
+fixo de 120 ms sem nada acontecer. Agora ele abre, espera de verdade o
+texto novo chegar e só então fala. Também ficou mais simples copiar
+(Ctrl+C), ler completa (Ctrl+R) e abrir em janela (Alt+C): os três partem
+da mesma leitura do texto. O Ctrl+C copia só o que está visível, de
+propósito; o Ctrl+R e o Alt+C abrem o “ler mais” quando a mensagem está
+cortada. Se o WhatsApp demorar mais de 1,2 segundo para expandir, o que
+estiver visível é falado.</p>
+<p><strong>6. Controle de áudio.</strong></p>
+<ul>
+<li><strong>Alt+P</strong> pausa ou retoma o áudio da mensagem em
+foco.</li>
+<li><strong>Ctrl+S</strong> aumenta ou diminui a velocidade do
+áudio.</li>
+</ul>
+<p>As duas só agem quando existe um player na mensagem; fora disso a
+tecla segue o caminho normal, então não atrapalham nada.</p>
+<p><strong>7. Licença em ordem.</strong> O addon é GPL-2 (era exigência
+dos dois addons de origem). O arquivo <code>COPYING</code> agora está no
+repositório e os créditos estão na seção “Licença e créditos”. O
+<code>manifest.ini</code> não ganhou campo de licença porque esse campo
+não existe no padrão de addon do NVDA.</p>
 <h3
 id="escopo-separado-app-web-e-correções-que-valem-nos-dois-lados">1.3.0
 (2026-10-22) — Escopo separado (app / web) e correções que valem nos
@@ -843,6 +908,33 @@ que já força modo foco de propósito). WhatsApp Web ganhou um script
 próprio de NVDA+Espaço (antes dependia só do padrão do NVDA, que era
 revertido pelo watchdog).</p>
 <hr />
+<h2 id="licença-e-créditos">Licença e créditos</h2>
+<p>Este addon é <strong>GPL versão 2</strong> (GNU General Public
+License v2). O texto completo está no arquivo <code>COPYING</code>, na
+raiz do repositório. Em resumo:</p>
+<ol type="1">
+<li>Você pode usar, estudar, copiar e modificar o addon livremente.</li>
+<li>Se você distribuir uma versão modificada, ela também precisa ser
+GPL-2 e precisa manter os créditos abaixo.</li>
+<li>O addon é distribuído sem garantia, como manda a própria GPL.</li>
+</ol>
+<p>A licença GPL-2 é obrigatória aqui porque o código deriva de dois
+addons que já usavam essa licença. Não é uma escolha nova — é a condição
+para poder usar o que eles escreveram.</p>
+<p>Créditos:</p>
+<ol type="1">
+<li><strong>mrido1</strong> — autor do <code>whatsAppEnhancer</code>,
+origem da janela de texto, do inspetor de elemento, da revisão de último
+texto falado e do filtro de números.</li>
+<li><strong>Nuno Costa</strong> — autor do <code>whatsAppNG</code>,
+origem da navegação (Alt+1/2/D), copiar, ler mensagem completa, modo de
+navegação, reagir e menu de contexto.</li>
+<li><strong>Leo</strong> — unificação, escopo app/web, correções de
+robustez, controle de áudio e a documentação em português.</li>
+</ol>
+<p>Se o repositório for publicado, o arquivo <code>COPYING</code>
+precisa ir junto.</p>
+<hr />
 <h2 id="como-versionar-renomear">Como versionar / renomear</h2>
 <p>O nome interno do addon está em <code>manifest.ini</code> (campo
 <code>name</code>) e em <code>wa_global.py</code> (registro do
@@ -867,7 +959,7 @@ class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a hr
 <span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>            arcname <span class="op">=</span> os.path.relpath(filepath, base)</span>
 <span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>            z.write(filepath, arcname)</span></code></pre></div>
 <hr />
-<h2 id="versão-atual-1.3.0">Versão atual: 1.3.0</h2>
+<h2 id="versão-atual-1.4.0">Versão atual: 1.4.0</h2>
 <p>Criado em: 2026-04-05 Autor: Leo (baseado em mrido1 e Nuno Costa)</p>
 </body>
 </html>

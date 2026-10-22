@@ -45,6 +45,47 @@ from NVDAObjects.IAccessible.ia2Web import Ia2Web
 
 addonHandler.initTranslation()
 
+# A partir do NVDA 2026.2 existe um módulo nativo para o WhatsApp
+# (nvdaBuiltin.appModules.whatsapp_root). Herdamos dele quando ele existe,
+# para não anular o que o NVDA já faz sozinho (por exemplo desligar o modo
+# de navegação) e para continuar funcionando se o NVDA mudar por dentro.
+# Em NVDA mais antigo, a base é o módulo de aplicativo comum.
+try:
+    from nvdaBuiltin.appModules.whatsapp_root import AppModule as _BuiltinAppModule
+except Exception:
+    _BuiltinAppModule = appModuleHandler.AppModule
+
+# Estados por nome, sem números mágicos: o número muda entre versões do NVDA.
+_STATE_COLLAPSED = getattr(controlTypes.State, "COLLAPSED", None)
+_STATE_FOCUSABLE = getattr(controlTypes.State, "FOCUSABLE", None)
+
+# Papéis que podem ser item de menu (varia conforme a versão do NVDA).
+_MENU_ITEM_ROLES = frozenset(
+    role for role in (
+        getattr(controlTypes.Role, "MENUITEM", None),
+        getattr(controlTypes.Role, "BUTTON", None),
+        getattr(controlTypes.Role, "LISTITEM", None),
+        getattr(controlTypes.Role, "CHECKBOX", None),
+        getattr(controlTypes.Role, "RADIOBUTTON", None),
+    ) if role is not None
+)
+
+# Rótulo do botão de velocidade do áudio ("1x", "1,5x", "2×").
+_SPEED_RE = re.compile(r"^\s*\d+(?:[.,]\d+)?\s*[x×]\s*$", re.IGNORECASE)
+
+# Espera do "ler mais": confere o texto a cada 60 ms, até 21 vezes (1,26 s).
+_EXPAND_DELAY_MS = 60
+_EXPAND_MAX_TRIES = 20
+
+# Papéis de um contêiner de menu. DIALOG fica de fora de propósito: um
+# diálogo grande (configurações, por exemplo) não deve ter as setas presas.
+_MENU_CONTAINER_ROLES = frozenset(
+    role for role in (
+        getattr(controlTypes.Role, "MENU", None),
+        getattr(controlTypes.Role, "POPUPMENU", None),
+    ) if role is not None
+)
+
 CONFIG_SECTION = "whatsAppUnified"
 SPEC = {
     "scope":              "string(default='both')",   # 'desktop', 'web', 'both'
@@ -162,9 +203,19 @@ def _collect_buttons_until(obj, stop_obj):
     return buttons, False
 
 
+def _has_state(obj, state):
+    """Confere se o objeto tem um estado do NVDA, sem depender de números."""
+    if state is None:
+        return False
+    try:
+        return state in getattr(obj, "states", ())
+    except Exception:
+        return False
+
+
 def _find_collapsed(obj):
     try:
-        if _role(obj) == controlTypes.Role.BUTTON and 512 in getattr(obj, "states", set()):
+        if _role(obj) == controlTypes.Role.BUTTON and _has_state(obj, _STATE_COLLAPSED):
             return obj
         for child in getattr(obj, "children", []):
             result = _find_collapsed(child)
@@ -195,8 +246,12 @@ def _find_first_button(obj):
 # Ctrl+Enter só ao objeto específico do menu quando ele ganha foco, nunca ao
 # teclado inteiro do Windows.
 class _MenuNavBase(Ia2Web):
-    _v_idx = -1
-    _items_cache = None
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Estado por objeto: antes ficava na classe, então dois menus
+        # compartilhavam a mesma posição e a mesma lista de itens.
+        self._v_idx = -1
+        self._items_cache = None
 
     def _collect_items(self):
         raise NotImplementedError
@@ -266,70 +321,64 @@ class _MenuNavBase(Ia2Web):
     }
 
 
-class CallMenuDialog(_MenuNavBase):
-    """Menu de chamada (Shift+Alt+C) — junta os itens de dentro do próprio objeto."""
+class WhatsAppMenuDialog(_MenuNavBase):
+    """Menu do WhatsApp (contexto, chamada, cabeçalho, configurações).
 
-    def _collect_items(self):
-        items = []
-        stack = [self]
-        visited = 0
-        while stack and visited < 200:
-            o = stack.pop()
-            visited += 1
-            if o is not self:
-                is_item = _role(o) in (controlTypes.Role.BUTTON, controlTypes.Role.LISTITEM)
-                cls = getattr(o, "IA2Attributes", {}).get("class", "")
-                if "xjb2p0i" in cls or "xk390pu" in cls or "_ahkm" in cls:
-                    is_item = True
-                if is_item:
-                    name = o.name
-                    if not name:
-                        sub = _collect(o, lambda x: bool(x.name), max_items=10)
-                        name = " ".join(s.name for s in sub if s.name)
-                    if name and name.strip():
-                        items.append(o)
-                        continue
-            try:
-                child = o.lastChild
-                while child:
-                    stack.append(child)
-                    child = child.previous
-            except Exception:
-                pass
-        return items
+    Antes existiam duas classes que só eram ativadas por nomes de classe CSS
+    do site. Esses nomes mudam a cada versão do WhatsApp Web. Agora o menu é
+    reconhecido pelo papel acessível do objeto (MENU/POPUPMENU/DIALOG com
+    itens) e as pistas de CSS ficam só como reserva para versões antigas.
 
+    Se nenhum item for encontrado, as setas continuam indo para o aplicativo
+    (ver `_MenuNavBase.script_next`), então um falso positivo não sequestra
+    o teclado.
+    """
 
-class HeaderMenuDialog(_MenuNavBase):
-    """Menu do cabeçalho da conversa ("..." do topo, config de grupo etc.)."""
-
-    def _collect_items(self):
+    def _find_root(self):
+        """Sobe até o retângulo grande que contém o menu inteiro."""
         root = self
-        while root and root.parent and _role(root) != controlTypes.Role.WINDOW:
-            loc = root.location
+        for _ in range(6):
+            parent = getattr(root, "parent", None)
+            if not parent or _role(root) == controlTypes.Role.WINDOW:
+                break
+            loc = getattr(root, "location", None)
             if loc and loc.width > 300 and loc.height > 300:
                 break
-            root = root.parent
+            root = parent
+        return root
+
+    @staticmethod
+    def _is_item(obj):
+        role = _role(obj)
+        if role in _MENU_ITEM_ROLES:
+            return True
+        static_text = getattr(controlTypes.Role, "STATICTEXT", None)
+        name = (getattr(obj, "name", "") or "").strip()
+        return role == static_text and len(name) > 1
+
+    @staticmethod
+    def _item_name(obj):
+        name = (getattr(obj, "name", "") or "").strip()
+        if not name:
+            sub = _collect(obj, lambda x: bool(getattr(x, "name", "")), max_items=10)
+            name = " ".join(s.name for s in sub if s.name).strip()
+        return name
+
+    def _collect_items(self):
+        root = self._find_root()
         items = []
         stack = [root]
         visited = 0
         while stack and visited < 300:
-            o = stack.pop()
+            obj = stack.pop()
             visited += 1
-            if o is not root:
-                is_target = _role(o) in (controlTypes.Role.BUTTON, controlTypes.Role.LISTITEM)
-                if (not is_target and _role(o) == controlTypes.Role.STATICTEXT
-                        and o.name and len(o.name.strip()) > 1):
-                    is_target = True
-                if is_target:
-                    name = o.name
-                    if not name:
-                        sub = _collect(o, lambda x: bool(x.name), max_items=10)
-                        name = " ".join(s.name for s in sub if s.name)
-                    if name and name.strip():
-                        items.append(o)
-                        continue
+            if obj is not root and self._is_item(obj) and self._item_name(obj):
+                items.append(obj)
+                # Não entra nos filhos de um item já válido, senão o texto
+                # interno dele apareceria de novo como item separado.
+                continue
             try:
-                child = o.lastChild
+                child = obj.lastChild
                 while child:
                     stack.append(child)
                     child = child.previous
@@ -339,7 +388,7 @@ class HeaderMenuDialog(_MenuNavBase):
 
 
 # ─── App Module ────────────────────────────────────────────────────────────────
-class AppModule(appModuleHandler.AppModule):
+class AppModule(_BuiltinAppModule):
 
     disableBrowseModeByDefault = True
     scriptCategory = _("WhatsApp Unificado")
@@ -381,17 +430,48 @@ class AppModule(appModuleHandler.AppModule):
             return True
 
     def chooseNVDAObjectOverlayClasses(self, obj, clsList):
+        # Deixa o módulo nativo do NVDA (quando existe) fazer a parte dele
+        # primeiro; depois acrescentamos as nossas classes.
+        try:
+            super().chooseNVDAObjectOverlayClasses(obj, clsList)
+        except Exception:
+            pass
         if not self._app_enabled():
             return
-        cls = getattr(obj, "IA2Attributes", {}).get("class", "")
-        if "x1c4vz4f" in cls and "x1nhvcw1" in cls:
-            clsList.insert(0, CallMenuDialog)
-        if "xyi3aci" in cls and "xe2zdcy" in cls:
-            clsList.insert(0, HeaderMenuDialog)
-        if "xuwfzo9" in cls and obj.parent:
-            p_cls = getattr(obj.parent, "IA2Attributes", {}).get("class", "")
-            if "xyi3aci" in p_cls:
-                clsList.insert(0, HeaderMenuDialog)
+        if clsList and WhatsAppMenuDialog in clsList:
+            return
+        if self._is_menu_container(obj):
+            clsList.insert(0, WhatsAppMenuDialog)
+
+    @staticmethod
+    def _is_menu_container(obj):
+        """Reconhece um menu pelo significado acessível, não pelo CSS.
+
+        Ordem: papel do NVDA → atributo xml-roles → nomes de classe CSS
+        observados em versões antigas do WhatsApp Web (reserva).
+        """
+        try:
+            if _role(obj) in _MENU_CONTAINER_ROLES:
+                return True
+            attrs = getattr(obj, "IA2Attributes", None) or {}
+            xml_roles = (attrs.get("xml-roles") or "").strip().lower()
+            if xml_roles in ("menu", "menubar", "popupmenu"):
+                return True
+            # Reserva para versões antigas: só ativa quando o CSS conhecido
+            # aparece, e mesmo assim as setas caem no send() se não houver
+            # item reconhecível dentro.
+            cls = attrs.get("class") or ""
+            if "x1c4vz4f" in cls and "x1nhvcw1" in cls:
+                return True
+            if "xyi3aci" in cls and "xe2zdcy" in cls:
+                return True
+            if "xuwfzo9" in cls and getattr(obj, "parent", None):
+                parent_attrs = getattr(obj.parent, "IA2Attributes", None) or {}
+                if "xyi3aci" in (parent_attrs.get("class") or ""):
+                    return True
+        except Exception:
+            pass
+        return False
 
     def _load_config(self):
         if CONFIG_SECTION not in config.conf:
@@ -601,39 +681,69 @@ class AppModule(appModuleHandler.AppModule):
             pass
         return False
 
-    def _get_message_text(self, expand=True):
+    def _collect_message_text(self, parent):
+        """Junta todo o texto visível de uma mensagem, na ordem da tela."""
+        parts = []
+        try:
+            for sibling in getattr(parent, "children", []) or []:
+                parts.extend(_collect_texts(sibling, 20))
+        except Exception:
+            pass
+        return " ".join(part for part in parts if part)
+
+    @staticmethod
+    def _find_expand_button(parent):
+        """Localiza o botão "ler mais" de uma mensagem cortada."""
+        for sibling in getattr(parent, "children", []) or []:
+            collapsed = _find_collapsed(sibling)
+            if not collapsed:
+                continue
+            all_btns, _ = _collect_buttons_until(sibling, collapsed)
+            focusable = [b for b in all_btns if _has_state(b, _STATE_FOCUSABLE)]
+            if focusable:
+                return focusable[1] if len(focusable) >= 2 else focusable[0]
+        return None
+
+    def _expand_message_then(self, parent, callback):
+        """Clica em "ler mais" e entrega o texto já expandido.
+
+        A expansão acontece dentro do WhatsApp, em outro processo: não dá
+        para ler o texto novo de forma síncrona. Em vez de esperar um tempo
+        fixo, conferimos o texto de tempos em tempos e entregamos assim que
+        ele crescer. Se não crescer dentro do prazo (WhatsApp lento), o que
+        houver é entregue no fim, para a tecla nunca ficar sem resposta.
+        """
+        button = self._find_expand_button(parent)
+        if not button:
+            callback(self._collect_message_text(parent))
+            return
+        before = self._collect_message_text(parent)
+        try:
+            button.doAction()
+        except Exception:
+            # O elemento pode sumir entre procurar e clicar (mensagem nova
+            # chegando, lista rolando). Nesse caso fala o que já está visível.
+            callback(before)
+            return
+
+        def _poll(tries_left):
+            current = self._collect_message_text(parent)
+            if len(current) > len(before) or tries_left <= 0:
+                callback(current)
+                return
+            wx.CallLater(_EXPAND_DELAY_MS, _poll, tries_left - 1)
+
+        wx.CallLater(_EXPAND_DELAY_MS, _poll, _EXPAND_MAX_TRIES)
+
+    def _get_message_text(self):
+        """Texto já visível da mensagem em foco (sem clicar em "ler mais")."""
         if not self._is_message_list():
             return None, _("Não está na lista de mensagens")
         focus = api.getFocusObject()
         parent = getattr(focus, "parent", None)
         if not parent:
             return None, _("Mensagem não encontrada")
-        siblings = getattr(parent, "children", []) or []
-        parts = []
-        for s in siblings:
-            parts.extend(_collect_texts(s, 20))
-        existing = " ".join(parts)
-        if len(existing) > 800 or not expand:
-            return (existing, None) if existing else (None, _("Texto não encontrado"))
-        for s in siblings:
-            collapsed = _find_collapsed(s)
-            if collapsed:
-                all_btns, _ = _collect_buttons_until(s, collapsed)
-                focusable = [b for b in all_btns if 16777216 in getattr(b, "states", set())]
-                btn = (focusable[1] if len(focusable) >= 2
-                       else focusable[0] if focusable else None)
-                if not btn:
-                    continue
-                btn.doAction()
-                wx.CallLater(120, lambda: None)
-                new_parts = []
-                try:
-                    for sib in getattr(parent, "children", []):
-                        new_parts.extend(_collect_texts(sib, 20))
-                except Exception:
-                    pass
-                full = "\r\n".join(new_parts)
-                return (full, None) if full and len(full) > 300 else (None, _("Texto não encontrado"))
+        existing = self._collect_message_text(parent)
         return (existing, None) if existing else (None, _("Texto não encontrado"))
 
     def _get_electron_container(self):
@@ -857,15 +967,69 @@ class AppModule(appModuleHandler.AppModule):
                     if btn:
                         btn.doAction()
                         return
+            buttons, slider = self._find_player()
+            if slider is not None and buttons:
+                buttons[-1].doAction()
+                return
+            gesture.send()
+        except Exception:
+            gesture.send()
+
+    def _find_player(self):
+        """Botões e controle de posição do player da mensagem em foco.
+
+        Acha o controle deslizante (barra de posição do áudio) e junta os
+        botões que vêm antes dele. Não usa nome de classe do site.
+        """
+        if not self._is_message_list():
+            return None, None
+        try:
+            focus = api.getFocusObject()
+            parent = getattr(focus, "parent", None)
+            if not parent:
+                return None, None
             for sibling in getattr(parent, "children", []) or []:
                 slider = _find_slider(sibling)
                 if slider:
-                    all_btns, _ = _collect_buttons_until(sibling, slider)
-                    if all_btns:
-                        all_btns[-1].doAction()
-                        return
-            gesture.send()
+                    buttons, _ = _collect_buttons_until(sibling, slider)
+                    return buttons or [], slider
         except Exception:
+            pass
+        return None, None
+
+    @script(
+        description=_("Pausar ou retomar o áudio da mensagem"),
+        gesture="kb:alt+p",
+    )
+    def script_audioToggle(self, gesture):
+        buttons, slider = self._find_player()
+        if slider is None:
+            gesture.send()
+            return
+        # O último botão antes da barra de posição é o play/pause.
+        target = buttons[-1] if buttons else slider
+        target.doAction()
+
+    @script(
+        description=_("Aumentar ou diminuir a velocidade do áudio"),
+        gesture="kb:control+s",
+    )
+    def script_audioSpeed(self, gesture):
+        buttons, slider = self._find_player()
+        if slider is None:
+            gesture.send()
+            return
+        for button in reversed(buttons or []):
+            name = (getattr(button, "name", "") or "").strip()
+            value = str(getattr(button, "value", "") or "").strip()
+            if _SPEED_RE.match(name) or _SPEED_RE.match(value):
+                button.doAction()
+                return
+        # Sem rótulo de velocidade reconhecível: no player do WhatsApp Web
+        # ele é o botão imediatamente antes do play/pause.
+        if buttons and len(buttons) >= 2:
+            buttons[-2].doAction()
+        else:
             gesture.send()
 
     @script(description=_("Menu de contexto da mensagem"), gesture="kb:shift+enter")
@@ -887,7 +1051,7 @@ class AppModule(appModuleHandler.AppModule):
                 if not btns:
                     continue
                 for btn in btns:
-                    if 512 in getattr(btn, "states", set()):
+                    if _has_state(btn, _STATE_COLLAPSED):
                         btn.doAction()
                         return
                 btns[-1].doAction()
@@ -907,7 +1071,7 @@ class AppModule(appModuleHandler.AppModule):
             if not name:
                 gesture.send()
                 return
-            text, _ = self._get_message_text(expand=False)
+            text, _ = self._get_message_text()
             if text:
                 api.copyToClip(text)
                 ui.message(_("Copiado"))
@@ -930,63 +1094,43 @@ class AppModule(appModuleHandler.AppModule):
         if not parent:
             ui.message(_("Mensagem não encontrada"))
             return
-        siblings = getattr(parent, "children", []) or []
-        parts = []
-        for s in siblings:
-            parts.extend(_collect_texts(s, 20))
-        existing = " ".join(parts)
+        existing = self._collect_message_text(parent)
         if len(existing) > 800:
             ui.message(existing)
             return
-        for s in siblings:
-            collapsed = _find_collapsed(s)
-            if collapsed:
-                all_btns, _ = _collect_buttons_until(s, collapsed)
-                focusable = [b for b in all_btns
-                             if 16777216 in getattr(b, "states", set())]
-                btn = (focusable[1] if len(focusable) >= 2
-                       else focusable[0] if focusable else None)
-                if not btn:
-                    continue
-                btn.doAction()
-                msg_parent = parent
-                def _speak_after():
-                    new_parts = []
-                    try:
-                        for sib in getattr(msg_parent, "children", []):
-                            new_parts.extend(_collect_texts(sib, 20))
-                    except Exception:
-                        pass
-                    full = "\r\n".join(new_parts)
-                    speech.cancelSpeech()
-                    ui.message(full if full and len(full) > 300 else _("Texto não encontrado"))
-                wx.CallLater(150, _speak_after)
-                return
-        ui.message(_("Texto não encontrado"))
+        if not self._find_expand_button(parent):
+            ui.message(_("Texto não encontrado"))
+            return
+
+        def _speak_after(full):
+            speech.cancelSpeech()
+            ui.message(full if full and len(full) > 300 else _("Texto não encontrado"))
+
+        self._expand_message_then(parent, _speak_after)
 
     @script(description=_("Abrir mensagem em modo de navegação"), gesture="kb:alt+enter")
     def script_readCompleteMessageBrowse(self, gesture):
         if not self._is_message_list():
             gesture.send()
             return
-        text, error = self._get_message_text(expand=True)
-        if not error and text:
-            ui.browseableMessage(text)
-            return
         focus = api.getFocusObject()
         parent = getattr(focus, "parent", None)
-        if parent:
-            parts = []
-            for s in getattr(parent, "children", []) or []:
-                parts.extend(_collect_texts(s, 20))
-            if parts:
-                ui.browseableMessage(" ".join(parts))
-                return
-        name = (getattr(focus, "name", "") or "").strip()
-        if name:
-            ui.browseableMessage(name)
-        else:
-            gesture.send()
+        if not parent:
+            name = (getattr(focus, "name", "") or "").strip()
+            if name:
+                ui.browseableMessage(name)
+            else:
+                gesture.send()
+            return
+
+        def _browse(text):
+            body = (text or (getattr(focus, "name", "") or "")).strip()
+            if body:
+                ui.browseableMessage(body)
+            else:
+                ui.message(_("Texto não encontrado"))
+
+        self._expand_message_then(parent, _browse)
 
     @script(description=_("Reagir à mensagem"), gesture="kb:control+shift+enter")
     def script_reactMessage(self, gesture):
@@ -1002,7 +1146,7 @@ class AppModule(appModuleHandler.AppModule):
             for sibling in getattr(parent, "children", []) or []:
                 all_btns = _find_buttons(sibling)
                 for i, btn in enumerate(all_btns):
-                    if 512 in getattr(btn, "states", set()):
+                    if _has_state(btn, _STATE_COLLAPSED):
                         if i + 1 < len(all_btns):
                             all_btns[i + 1].doAction()
                             return
@@ -1015,9 +1159,18 @@ class AppModule(appModuleHandler.AppModule):
         obj = api.getFocusObject()
         text = getattr(obj, "name", "") or ""
         if self._is_message_list():
-            t, _ = self._get_message_text(expand=True)
-            if t:
-                text = t
+            parent = getattr(obj, "parent", None)
+            if parent:
+                def _show(full):
+                    body = (full or text).strip()
+                    if not body:
+                        ui.message(_("Texto não encontrado"))
+                        return
+                    from .wa_ui import TextWindow
+                    TextWindow(body, _("Mensagem"))
+
+                self._expand_message_then(parent, _show)
+                return
         if text.strip():
             from .wa_ui import TextWindow
             TextWindow(text.strip(), _("Mensagem"))
@@ -1235,7 +1388,7 @@ class AppModule(appModuleHandler.AppModule):
             f"E:{loc.left} T:{loc.top} L:{loc.width} A:{loc.height}"
             if loc else "sem posição")
         cls = getattr(obj, "IA2Attributes", {}).get("class", "")[:40]
-        role = controlTypes.roleLabels.get(obj.role, str(obj.role))
+        role = getattr(obj.role, "displayString", None) or str(obj.role)
         ui.message(f"Papel:{role} | {loc_str} | Nome:'{(obj.name or '')[:50]}' | Classe:{cls}")
 
 
