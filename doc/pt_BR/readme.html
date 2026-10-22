@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="pt-BR" xml:lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>WhatsApp Unified Accessibility</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">WhatsApp Unified Accessibility</h1>
+</header>
+<h1 id="addon-nvda-whatsapp-acessibilidade">Addon NVDA — WhatsApp
+Acessibilidade</h1>
+<h2 id="localização">Localização</h2>
+<pre><code>C:\Users\leodb\AppData\Roaming\nvda\addons\whatsAppUnified\</code></pre>
+<p>Arquivo distribuível (instalar em outro PC):
+<code>Desktop\whatsAppUnified-1.0.0.nvda-addon</code></p>
+<hr />
+<h2 id="estrutura-de-arquivos">Estrutura de arquivos</h2>
+<pre><code>whatsAppUnified/
+├── manifest.ini                  — metadados do addon
+├── appModules/
+│   ├── whatsapp_root.py          — lógica principal (Desktop)
+│   └── wa_ui.py                  — janela de texto acessível
+└── globalPlugins/
+    └── wa_global.py              — registro do executável + painel de configurações</code></pre>
+<hr />
+<h2 id="o-que-o-addon-faz">O que o addon faz</h2>
+<p>Unificação dos addons <code>whatsAppNG</code> (Nuno Costa) e
+<code>whatsAppEnhancer</code> (mrido1), com correções e proteções
+adicionais.</p>
+<p>Funciona para <strong>WhatsApp Desktop</strong> (WebView2/Electron) e
+tem opção de escopo nas configurações.</p>
+<hr />
+<h2
+id="estado-da-paridade-webdesktop-em-andamento-desde-12082026">Estado da
+paridade Web/Desktop (em andamento desde 12/08/2026)</h2>
+<p>O Desktop sempre teve muito mais recursos que o Web (o Web nasceu só
+com a parte de modo foco/navegação). Lista do que falta portar pro Web,
+indo um item por vez, testando com o Leo entre cada um — sem nome de
+classe fixo como método principal (ver changelog 1.2.11 sobre por que
+isso é arriscado sem inspecionar ao vivo).</p>
+<ul class="task-list">
+<li><label><input type="checkbox" checked="" />NVDA+Shift+I (inspecionar
+elemento) — 1.2.11</label></li>
+<li><label><input type="checkbox" />Alt+1 / Alt+2 / Alt+D (ir pra lista
+de conversas / mensagens / campo de digitação)</label></li>
+<li><label><input type="checkbox" />Enter (tocar mensagem de
+voz/vídeo)</label></li>
+<li><label><input type="checkbox" checked="" />Menu de contexto da
+mensagem — 1.2.16, refeito com
+<code>chooseNVDAObjectOverlayClasses</code> (classe
+<code>MessageMenuItemNav</code>, amarrada só a objetos MENUITEM
+confirmados como WhatsApp Web) depois que a tentativa global da 1.2.12
+quebrou navegação em toda página web e teve que ser revertida na
+1.2.13/1.2.14.</label></li>
+<li><label><input type="checkbox" />Ctrl+C (copiar
+mensagem)</label></li>
+<li><label><input type="checkbox" />Ctrl+R (ler mensagem
+completa/expandir “ler mais”)</label></li>
+<li><label><input type="checkbox" />Alt+Enter (abrir mensagem em modo de
+navegação)</label></li>
+<li><label><input type="checkbox" />Ctrl+Shift+Enter (reagir à
+mensagem)</label></li>
+<li><label><input type="checkbox" />Alt+C (abrir mensagem em janela de
+texto)</label></li>
+<li><label><input type="checkbox" />Shift+Alt+C (menu de
+chamada)</label></li>
+<li><label><input type="checkbox" />NVDA+Setas / NVDA+Ctrl+Setas /
+NVDA+Cima/Baixo (revisão de texto por char/palavra/linha)</label></li>
+<li><label><input type="checkbox" />Ctrl+Shift+E / NVDA+Shift+H
+(alternar filtros na hora)</label></li>
+<li><label><input type="checkbox" />Seta esquerda/direita protegida na
+lista de conversas</label></li>
+<li><label><input type="checkbox" />Ligar de vez os filtros automáticos
+(telefone/“Talvez”/dicas/duplicata) no Web, ou remover as opções da tela
+de configuração se não for portar (hoje aparecem mas não fazem nada no
+Web — bug conhecido, reportado 12/08)</label></li>
+<li><label><input type="checkbox" />Desktop: dar ao Escape a mesma
+esperteza do Web (cancelar resposta/edição no campo de digitação em vez
+de só sair do modo foco) — único item pendente na direção
+contrária</label></li>
+</ul>
+<hr />
+<h2
+id="configurações-nvda-preferências-whatsapp-unificado">Configurações
+(NVDA → Preferências → WhatsApp Unificado)</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Opção</th>
+<th>Padrão</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Aplicar para</td>
+<td>Desktop</td>
+<td>Desktop / WhatsApp Web / Ambos</td>
+</tr>
+<tr class="even">
+<td>Filtrar números de telefone nas mensagens</td>
+<td>Sim</td>
+<td>Remove números tipo +55 11… das mensagens</td>
+</tr>
+<tr class="odd">
+<td>Filtrar números na lista de conversas</td>
+<td>Não</td>
+<td>Idem para o painel esquerdo</td>
+</tr>
+<tr class="even">
+<td>Silenciar dicas de uso</td>
+<td>Sim</td>
+<td>Remove textos “Para mais opções…”</td>
+</tr>
+<tr class="odd">
+<td>Remover “Talvez” antes de nomes</td>
+<td>Sim</td>
+<td>Limpa “Talvez João” → “João”</td>
+</tr>
+<tr class="even">
+<td>Manter modo foco automaticamente</td>
+<td>Sim</td>
+<td>Força passThrough=True ao ganhar foco</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="atalhos">Atalhos</h2>
+<h3 id="navegação-herdado-do-whatsappng">Navegação (herdado do
+whatsAppNG)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Tecla</th>
+<th>Ação</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Alt+1</td>
+<td>Ir para lista de conversas</td>
+</tr>
+<tr class="even">
+<td>Alt+2</td>
+<td>Ir para lista de mensagens</td>
+</tr>
+<tr class="odd">
+<td>Alt+D</td>
+<td>Ir para campo de digitação</td>
+</tr>
+<tr class="even">
+<td>Enter</td>
+<td>Tocar mensagem de voz ou vídeo</td>
+</tr>
+<tr class="odd">
+<td>Shift+Enter</td>
+<td>Menu de contexto da mensagem</td>
+</tr>
+<tr class="even">
+<td>Ctrl+C</td>
+<td>Copiar mensagem atual</td>
+</tr>
+<tr class="odd">
+<td>Ctrl+R</td>
+<td>Ler/expandir mensagem cortada</td>
+</tr>
+<tr class="even">
+<td>Alt+Enter</td>
+<td>Abrir mensagem em modo de navegação</td>
+</tr>
+<tr class="odd">
+<td>Ctrl+Shift+Enter</td>
+<td>Reagir à mensagem</td>
+</tr>
+<tr class="even">
+<td>NVDA+Shift+H</td>
+<td>Alternar filtro de dicas de uso</td>
+</tr>
+</tbody>
+</table>
+<h3 id="extras-herdado-do-whatsappenhancer">Extras (herdado do
+whatsAppEnhancer)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Tecla</th>
+<th>Ação</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Alt+C</td>
+<td>Abrir mensagem em janela de texto</td>
+</tr>
+<tr class="even">
+<td>Shift+Alt+C</td>
+<td>Abrir menu de chamada</td>
+</tr>
+<tr class="odd">
+<td>NVDA+Setas</td>
+<td>Revisar último texto falado (char/word/line)</td>
+</tr>
+<tr class="even">
+<td>Ctrl+Shift+E</td>
+<td>Alternar filtro de números de telefone</td>
+</tr>
+<tr class="odd">
+<td>NVDA+Space</td>
+<td>Alternar modo de navegação</td>
+</tr>
+<tr class="even">
+<td>NVDA+Shift+I</td>
+<td>Inspecionar elemento (debug)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="proteção-de-navegação">Proteção de navegação</h3>
+<ul>
+<li>Seta esquerda na lista de conversas → redireciona para cima (evita
+entrar em botões inline)</li>
+<li>Seta direita na lista de conversas → redireciona para baixo</li>
+</ul>
+<hr />
+<h2 id="problemas-conhecidos-pendentes">Problemas conhecidos /
+pendentes</h2>
+<h3 id="chamadas-acidentais-com-setas-no-histórico">Chamadas acidentais
+com setas no histórico</h3>
+<p>Ao navegar com setas esquerda/direita dentro de mensagens (reações,
+áudio, arquivos, links), o foco pode escapar para os botões de chamada
+no cabeçalho da conversa. Em alguns casos o WhatsApp Desktop dispara a
+chamada ao receber foco nesse botão (comportamento do WebView2).</p>
+<p><strong>Status:</strong> Parcialmente mitigado (conv list protegida).
+Para investigar mais: usar <code>NVDA+Shift+I</code> com foco no botão
+problemático para identificar role, classe CSS e nome exato, e então
+adicionar proteção precisa.</p>
+<h3 id="prioridade-de-áudio-ducking">Prioridade de áudio (ducking)</h3>
+<p>Configurado <code>audioDuckingMode = 1</code> no nvda.ini. Abaixa
+outros sons quando o NVDA fala.</p>
+<h3 id="atenuação-de-chamadas">Atenuação de chamadas</h3>
+<p>Registro Windows <code>UserDuckingPreference=3</code> aplicado —
+Windows não mais abaixa o NVDA durante chamadas VoIP.</p>
+<hr />
+<h2 id="changelog">Changelog</h2>
+<h3
+id="escopo-separado-app-web-e-correções-que-valem-nos-dois-lados">1.3.0
+(2026-10-22) — Escopo separado (app / web) e correções que valem nos
+dois lados</h3>
+<p>Esta versão nasceu da análise feita com o REA no WhatsApp Desktop e
+no WhatsApp Web (relatório em
+<code>~/rea-analises/whatsapp/relatorio.md</code>). O achado principal:
+o app do Windows não tem interface própria — ele abre o mesmo
+<code>web.whatsapp.com</code> dentro de uma janela WebView2. Por isso o
+que funciona num lado funciona no outro, e o que atrapalha também.</p>
+<p><strong>1. O “Aplicar para” agora funciona de verdade.</strong> Antes
+o módulo do aplicativo lia a opção de escopo e não fazia nada com ela —
+por isso algumas coisas funcionavam no app e outras no web, mesmo com a
+opção marcada. Agora: - <code>Apenas aplicativo (Desktop)</code>: o
+plugin global não mexe em nada dentro do navegador; o módulo do
+aplicativo trabalha normalmente. -
+<code>Apenas WhatsApp Web (navegador)</code>: o módulo do aplicativo não
+altera nada (não força modo foco, não filtra nome de objeto e todos os
+atalhos dele apenas repassam a tecla); o plugin global trabalha no
+navegador. - <code>Ambos</code>: os dois lados trabalham (padrão).</p>
+<p><strong>2. Registro do executável em minúsculas.</strong> O NVDA
+guarda o nome do executável em minúsculas e o registro anterior
+(<code>"WhatsApp"</code>, <code>"WhatsApp.Root"</code>) não batia — o
+módulo só carregava por sorte, pelo caminho alternativo de trocar ponto
+por sublinhado. Agora está <code>"whatsapp"</code> e
+<code>"whatsapp.root"</code>.</p>
+<p><strong>3. Dica de uso real.</strong> A frase que o WhatsApp fala
+hoje é “Para acessar o menu e encontrar mais opções, pressione a tecla
+de seta para a esquerda ou direita”. Ela não estava na lista e por isso
+continuava sendo lida depois da mensagem. Incluída, junto com as
+variantes em outros idiomas.</p>
+<p><strong>4. Filtros passaram a valer no WhatsApp Web.</strong> O
+plugin global não tinha o tratamento de nome de objeto
+(<code>event_NVDAObject_init</code>), então as caixas “filtrar números”,
+“dica de uso” e “remover Talvez” apareciam nas configurações mas não
+faziam nada no navegador. Agora fazem — com a mesma regra do app:
+telefone na lista de conversas só é filtrado se a caixa da lista de
+conversas estiver marcada, e na lista de mensagens só se a caixa das
+mensagens estiver marcada.</p>
+<p><strong>5. Ir para a lista de conversas / de mensagens.</strong> A
+detecção de qual lista é qual deixou de depender só da posição na tela
+(coluna da esquerda, largura pequena) e passou a usar primeiro o nome
+que o próprio WhatsApp publica (“Lista de conversas”, “Mensagens”), em
+LIST ou TABLE — a lista de conversas hoje é publicada como grade. A
+regra por posição ficou só como reserva.</p>
+<p><strong>6. Pacote em ordem para o NVDA 2026.2.</strong> O endereço do
+projeto entrou no <code>manifest.ini</code> (antes vazio) e a ajuda do
+add-on passou a vir dentro do pacote (<code>doc/pt_BR/readme.html</code>
+e <code>doc/en/readme.html</code>, gerados deste README) — antes o
+<code>docFileName</code> apontava para um arquivo que não existia, e o
+botão de ajuda do NVDA não tinha o que abrir.</p>
+<h3 id="web-desfeita-a-1.2.18-corrigido-pela-raiz">1.2.19 (2026-08-14) —
+Web: desfeita a 1.2.18, corrigido pela raiz</h3>
+<p><strong>O Leo apontou:</strong> a navegação própria por
+<code>setFocus()</code> entre botões-irmãos (1.2.18) não resolveu nada —
+“a mesma coisa ainda”. Pediu pra analisar de novo o que o Desktop faz de
+verdade: <strong>nada.</strong> O Desktop não tem nenhum código pra
+andar entre reagir/responder/ encaminhar/tocar áudio/link dentro de uma
+mensagem — só deixa a seta chegar crua na página
+(<code>gesture.send()</code>) contanto que o modo foco esteja ligado.
+Quem faz a navegação de verdade é o próprio JavaScript do WhatsApp.</p>
+<p><strong>Causa real:</strong> o reforço de modo foco do Web só cobria
+a LINHA da mensagem (papel SECTION/UNKNOWN), não os BOTÕES dentro dela —
+então ao entrar num botão específico (foto do remetente, mensagem
+citada, reagir…) o modo foco podia ser perdido no meio do caminho (mesmo
+bug do NVDA que afeta menus), e a tentativa de reconstruir a navegação
+na mão (1.2.18) não replicava certo a ordem/estrutura real dos
+botões.</p>
+<p><strong>Corrigido de verdade:</strong> removida a classe
+<code>MessageInlineButtonNav</code> e toda a navegação manual. Em vez
+disso, o reforço de modo foco (<code>event_gainFocus</code>) agora
+também cobre qualquer BUTTON com ancestral
+<code>focusable-list-item</code> (a mesma convenção que já identifica
+“isso é uma linha de mensagem”) — ou seja, mantém o modo foco ligado o
+tempo todo dentro de uma mensagem, exatamente como o Desktop já faz por
+padrão, e deixa o WhatsApp cuidar da navegação sozinho. Menos código,
+mais fiel ao que já funciona do outro lado.</p>
+<h3 id="web-botões-dentro-da-mensagem-ganham-navegação-segura">1.2.18
+(2026-08-14) — Web: botões dentro da mensagem ganham navegação
+segura</h3>
+<p><strong>Diagnosticado com o Leo via inspetor:</strong> seta pra
+direita numa mensagem levava pro botão de nome/foto de quem mandou
+(“Talvez Wellington”), seta de novo levava pra “Mensagem citada” — e a
+partir daí, mais seta passava a andar por CARACTERE em vez de trocar de
+botão. Mesmo bug do NVDA que afeta menus (perde o modo foco no meio do
+caminho), só que dessa vez com esquerda/direita em vez de cima/baixo,
+dentro dos botões inline de uma mensagem (foto/nome do remetente,
+mensagem citada, reagir, responder, encaminhar, “…”).</p>
+<p><strong>Corrigido com a mesma técnica segura:</strong> nova classe
+<code>MessageInlineButtonNav</code>, via
+<code>chooseNVDAObjectOverlayClasses</code> — só se aplica a BUTTON que
+(a) está confirmado dentro do WhatsApp Web (checagem de URL) e (b) tem
+um ancestral com a classe <code>focusable-list-item</code> (mesma
+convenção que o Desktop já usa pra identificar “isso é uma linha de
+mensagem”). Seta esquerda/direita agora anda pelos botões irmãos com
+foco real, sem depender do comportamento problemático do NVDA. Nenhum
+atalho novo é global — só existe pra esses botões específicos, então não
+interfere em nenhum outro botão de nenhum outro site.</p>
+<h3 id="web-corrigida-regressão-da-checagem-por-url-na-lista">1.2.17
+(2026-08-13) — Web: corrigida regressão da checagem por URL na
+lista</h3>
+<p><strong>Achado pelo Leo:</strong> depois da 1.2.13 (troca do título
+de janela pela URL real, mais precisa), a lista de conversas/mensagens
+perdeu o reforço de modo foco especificamente — o resto (menu de
+contexto, campo de digitação) continuou bem. Causa:
+<code>_check_whatsapp_web</code> retornava <code>False</code> na hora
+assim que encontrava uma URL de documento que não batia com
+“web.whatsapp.com”, sem tentar o título como reserva — e alguns
+elementos (parece que principalmente os da lista) usam UIA em vez de
+IA2, onde esse identificador de documento às vezes não é uma URL de
+verdade, batendo errado. Corrigido: a URL agora só conta como resposta
+POSITIVA (bate = com certeza é WhatsApp Web); se não bater, cai pro
+título como reserva — igual era até a 1.2.12, sem perder a precisão
+extra da URL onde ela funciona.</p>
+<h3
+id="web-menu-de-contexto-da-mensagem-dessa-vez-do-jeito-seguro">1.2.16
+(2026-08-13) — Web: menu de contexto da mensagem, dessa vez do jeito
+seguro</h3>
+<p><strong>Confirmado com pesquisa:</strong> desde dez/2025 o WhatsApp
+Desktop (Windows) carrega literalmente o <code>web.whatsapp.com</code>
+dentro do WebView2 — mesma página, mesmo pacote, mesmas classes CSS nos
+dois lados (não é só “parecido”). O atalho do Leo na área de trabalho
+(“WhatsApp Web.lnk”) é um app instalado do Chrome
+(<code>chrome_proxy.exe</code>,
+<code>--app-id=hnpfjngllnobngcgfapefoaidbinmjnm</code>) — roda numa
+janela isolada, sem misturar com abas comuns, o que reforça a precisão
+da checagem por URL já em uso desde a 1.2.13.</p>
+<p><strong>Menu de contexto no Web, refeito do zero com o método
+seguro:</strong> classe <code>MessageMenuItemNav</code>, registrada via
+<code>chooseNVDAObjectOverlayClasses</code> — só se aplica a objetos com
+papel MENUITEM E que passam na checagem de URL (recalculada na hora, não
+usa cache, pra evitar corrida com o ciclo de eventos do NVDA). Seta
+cima/baixo anda pros itens irmãos (Responder, Encaminhar, Apagar etc.)
+com foco real; Enter ativa. Diferente da tentativa da 1.2.12: aqui NADA
+é registrado como atalho global — os gestos só existem enquanto o objeto
+focado for exatamente um item desse menu específico, então não tem como
+vazar pra outro site nem repetir os acidentes das versões
+1.2.12/1.2.14.</p>
+<p><strong>Uso:</strong> igual sempre foi — Enter no botão “…” abre o
+menu (cai no primeiro item, hoje ainda uma reação); UMA seta pra baixo
+funciona nativamente (o próprio bug do NVDA #7836 garante isso) e leva
+pro primeiro item de texto; a partir daí a navegação própria assume e
+não escapa mais pra lugar nenhum.</p>
+<h3 id="desktop-menu-de-chamada-ganha-navegação-de-verdade">1.2.15
+(2026-08-13) — Desktop: menu de chamada ganha navegação de verdade</h3>
+<p><strong>Pesquisa no GitHub (a pedido do Leo):</strong> confirmado de
+novo, dessa vez via API de busca do GitHub (repositórios + código), que
+não existe nenhum addon de NVDA dedicado ao WhatsApp Web (navegador) em
+lugar nenhum — todo projeto “WhatsApp + NVDA” encontrado (incluindo um
+novo, indonésio, <code>taklukkan_WhatsApp</code>) mira o aplicativo
+Desktop, apesar de descrições às vezes confusas dizendo “web”. Nada novo
+pra aproveitar aí.</p>
+<p><strong>Desktop, resolvido:</strong> trazido do
+<code>whatsAppEnhancer</code> original o mecanismo de navegação virtual
+de menu (<code>CallMenuDialog</code>/<code>HeaderMenuDialog</code>, via
+<code>chooseNVDAObjectOverlayClasses</code>) que faltava no merge
+original do Leo. Antes, Shift+Alt+C só abria o menu de chamada mas não
+dava pra navegar dentro dele (mesmo bug do NVDA #7836 que afetou o Web).
+Agora, dentro desse menu específico, seta cima/baixo anda pelos itens e
+Ctrl+Enter ativa — amarrado só ao objeto do menu (nunca ao teclado
+inteiro), a técnica segura que deveria ter sido usada desde o início pro
+menu de contexto do Web também (fica pendente pra quando o Leo quiser
+retomar aquilo, agora com o padrão certo em mãos).</p>
+<h3 id="correção-urgente-2-mesmo-bug-de-raiz-no-esc">1.2.14 (2026-08-13)
+— CORREÇÃO URGENTE #2, mesmo bug de raiz no Esc</h3>
+<p><strong>Achado pelo Leo:</strong> depois de desativar o addon
+(precisou, pra conseguir fechar uma caixa de edição no Google Forms com
+Esc), ficou claro que o <code>script_escape</code> do WhatsApp Web tinha
+o MESMO problema da 1.2.13 — registrado como atalho GLOBAL
+(<code>kb:escape</code>, sem tecla NVDA junto). Mesmo checando “isso não
+é WhatsApp Web” e mandando <code>gesture.send()</code> de volta, isso
+não equivale a nunca ter interceptado: <code>gesture.send()</code> manda
+a tecla crua pro sistema, mas pula o mecanismo interno do NVDA de sair
+do modo foco (<code>disablePassThrough</code>) — que é exatamente o que
+outros sites (Google Forms incluso) esperam que aconteça quando o
+usuário aperta Esc num campo. Removido o <code>script_escape</code>
+inteiro do WhatsApp Web.</p>
+<p><strong>Regra daqui pra frente, valendo pra qualquer atalho futuro
+neste addon:</strong> só é seguro registrar atalho GLOBAL (GlobalPlugin)
+quando ele usa a tecla NVDA junto (<code>NVDA+Espaço</code>,
+<code>NVDA+Shift+I</code>) — essa tecla nunca chega no Windows/na página
+de qualquer forma, só o NVDA enxerga, então não tem nativo nenhum pra
+atrapalhar. Tecla comum sozinha (Enter, setas, Esc, Tab) — mesmo com
+checagem de “não é WhatsApp” e <code>gesture.send()</code> de volta —
+não é seguro como atalho global, porque <code>gesture.send()</code> não
+substitui o processamento nativo do NVDA pra essas teclas em NENHUM
+outro lugar do sistema. Qualquer coisa parecida no futuro precisa ser
+amarrada a um objeto específico
+(<code>chooseNVDAObjectOverlayClasses</code>, como o Desktop já faz) ou
+ficar de fora do escopo Web.</p>
+<h3 id="correção-urgente-reverte-parte-da-1.2.12">1.2.13 (2026-08-13) —
+CORREÇÃO URGENTE, reverte parte da 1.2.12</h3>
+<p><strong>Bug grave achado pelo Leo:</strong> depois da 1.2.12,
+navegação por seta parou de funcionar em QUALQUER página web comum, não
+só no WhatsApp. Causa: a navegação própria do menu de contexto registrou
+seta-pra-cima/baixo e Enter como atalho GLOBAL (GlobalPlugin) — isso
+intercepta essas teclas em toda a Windows, sempre, antes de qualquer
+outra coisa. Fora do WhatsApp Web o código tentava “deixar passar” com
+<code>gesture.send()</code>, mas isso manda a tecla crua pro sistema —
+que NÃO é a mesma coisa que o jeito do NVDA mover o cursor virtual e ler
+a linha em modo de navegação numa página comum. Resultado: só de existir
+o atalho global, o NVDA parava de fazer sua própria navegação de página
+em qualquer lugar.</p>
+<p><strong>Revertido nesta versão:</strong> toda a navegação própria do
+menu de contexto (helpers
+<code>_is_context_menu_button</code>/<code>_climb</code>/<code>_collect_menu_items</code>/<code>_open_context_menu</code>
+e os scripts
+<code>script_enterWeb</code>/<code>script_menuNextWeb</code>/<code>script_menuPrevWeb</code>)
+— WhatsApp Web volta a não ter essa função, mas a navegação normal de
+qualquer página está de volta ao normal.</p>
+<p><strong>Mantido e até melhorado:</strong> a detecção de “isso é
+WhatsApp Web” (<code>_check_whatsapp_web</code>) agora confere a
+<strong>URL real da aba</strong>
+(<code>treeInterceptor.documentConstantIdentifier</code>) em vez de só o
+título da janela — mais preciso, elimina o risco (bem mais moderado) de
+ativar em página errada por coincidência de título, que o Leo tinha
+perguntado sobre antes deste bug aparecer.</p>
+<p><strong>Lição pro próximo passo:</strong> a forma certa de
+reconstruir o menu de contexto (sem repetir esse erro) é usar
+<code>chooseNVDAObjectOverlayClasses</code> — o mesmo mecanismo que o
+<code>whatsAppEnhancer</code> usa no Desktop pro menu de chamada
+(<code>CallMenuDialog</code>/<code>HeaderMenuDialog</code> em
+<code>whatsapp_root.py</code> de lá). Isso amarra o atalho customizado
+só ao objeto específico do item de menu, nunca ao teclado inteiro do
+Windows — zero risco de vazar pra outras páginas. Fica pendente pra
+quando o Leo quiser retomar.</p>
+<h3 id="section">1.2.12 (2026-08-13)</h3>
+<p><strong>Menu de contexto da mensagem no WhatsApp Web, navegação
+própria.</strong> Diagnosticado com o Leo em sessão ao vivo usando o
+inspetor da 1.2.11: o bug de “cai na reação / desce pra conversa de
+baixo / vai pro painel de contato” ao tentar usar o menu “…” é o bug
+documentado do NVDA (issue #7836) com botões <code>aria-haspopup</code>
+— a primeira seta funciona dentro do menu, as seguintes escorregam pro
+modo de navegação sem avisar e passam a mover o cursor do NVDA pela
+página inteira em vez de andar no menu. Corrigido: Enter no botão “…”
+agora abre o menu e o addon mesmo junta os itens de papel “item de menu”
+(Responder, Encaminhar, Apagar etc. — sem emoji de reação, que tem botão
+próprio, confirmado com o Leo) numa lista, e passa a controlar seta
+cima/baixo/Enter/Esc sozinho enquanto essa lista existir, nunca mais
+tocando no caminho problemático do NVDA. Fingerprint do botão “…”
+confirmado por inspeção real (não suposição): papel botão + estado
+recolhido + pelo menos 3 das 5 classes conhecidas (mesmas do Desktop,
+valem também no Web).</p>
+<h3 id="section-1">1.2.11 (2026-08-12)</h3>
+<p><strong>Início da paridade Web (passo 1 de vários — ver seção “Estado
+da paridade Web/Desktop”):</strong> adicionado NVDA+Shift+I (inspecionar
+elemento) no WhatsApp Web, no mesmo formato do Desktop, com estados
+incluídos a mais. Zero risco (só lê e fala, não muda nada) — serve de
+ferramenta de diagnóstico pros próximos passos, já que não dá pra
+confirmar por fora se os nomes de classe do Desktop
+(<code>fd365im1</code>, <code>xjb2p0i</code>, etc.) valem pro Web sem
+inspecionar ao vivo (o bundle de JS da tela de login não inclui o código
+da conversa, só carrega depois do login). Os próximos passos vão
+preferir papel/estado do elemento (mais estável entre os dois lados) a
+nome de classe fixo, e usar esse inspetor pra confirmar antes de
+assumir.</p>
+<h3 id="section-2">1.2.10 (2026-08-12)</h3>
+<p><strong>Estendido o critério da 1.2.9 pra dentro da conversa
+também.</strong> Mover ENTRE mensagens (setas cima/baixo na lista de
+mensagens) é tratado pelo mesmo mecanismo do JavaScript do WhatsApp que
+trata a lista de conversas — precisa de modo foco sempre ligado, senão
+as setas viram navegação do NVDA em vez de andar entre mensagens.
+Critério agora é por PAPEL do elemento que ganha foco, não mais por
+“está dentro de uma TABLE”: qualquer item de lista
+(SECTION/TABLECELL/papel desconhecido — cobre linha da lista de
+conversas E linha de mensagem) reforça modo foco a cada troca de foco;
+qualquer outra coisa (BOTÃO de reagir, reproduzir, baixar, campo dentro
+de um submenu) só é forçada ao entrar no WhatsApp vindo de outro
+programa — mantendo a liberdade de Escape/NVDA+Espaço/Ctrl+setas pra
+explorar dentro de uma mensagem específica.</p>
+<h3 id="section-3">1.2.9 (2026-08-12)</h3>
+<p><strong>Corrigido regressão da 1.2.8:</strong> a lista de conversas
+(Web e, preventivamente, Desktop também) ficou com as setas não andando
+direito entre contatos. Causa: a 1.2.8 parou de reforçar o modo foco a
+cada troca de foco interna (pra não brigar com Escape/NVDA+Espaço na
+lista de mensagens e em submenus) — mas a lista de conversas é
+diferente: lá as setas são tratadas pelo próprio JavaScript do WhatsApp
+(seleção de item), então PRECISA ficar sempre em modo foco, senão as
+setas viram navegação do NVDA em vez de chegar cruas na página. Solução:
+duas velocidades, dependendo de onde o foco está. Na lista de conversas
+(dentro de uma TABLE — mesmo critério que já existia pra outras
+verificações no addon), o modo foco é reforçado a cada troca de foco,
+igual sempre foi. No resto da página (mensagens, submenus, campo de
+digitação), continua só forçando ao entrar no WhatsApp vindo de outro
+programa, preservando a correção da 1.2.8 pro Ctrl+setas e pro “Enter
+depois Esc”.</p>
+<h3 id="section-4">1.2.8 (2026-08-11)</h3>
+<p><strong>Reprojetado (correção definitiva):</strong> a 1.2.6/1.2.7
+ainda deixavam dois sintomas do mesmo problema de raiz: no Desktop,
+navegar por palavra com Ctrl+setas parou de funcionar (funcionava na
+Web); e pra abrir o submenu de uma mensagem (reagir, reproduzir áudio,
+etc.) ainda era preciso apertar Enter e depois Esc, nos dois lados.</p>
+<p>Causa: mesmo depois da 1.2.6, o addon continuava reagindo a QUALQUER
+mudança de modo do NVDA (evento <code>post_browseModeStateChange</code>)
+e revertendo pra modo foco — só que essa reversão só era pulada quando a
+MINHA PRÓPRIA tecla NVDA+Espaço tinha sido usada. Se o usuário saía do
+modo foco de outro jeito — inclusive pelo <strong>Escape nativo do
+NVDA</strong> (<code>disablePassThrough</code>, o mecanismo padrão do
+próprio NVDA pra isso, confirmado no código- fonte dele) — o addon
+revertia de volta quase instantaneamente, sem avisar. Isso explica o
+“Enter depois Esc” (o Esc chegava a funcionar um instante e era
+desfeito) e a navegação por Ctrl+setas travada (só funciona dentro do
+modo de navegação real).</p>
+<p><strong>Mudança de arquitetura:</strong> parei de reagir a mudanças
+de modo depois que elas acontecem. Agora o modo foco só é forçado em
+dois momentos deliberados: (1) ao entrar no WhatsApp vindo de outro
+programa (<code>event_foreground</code> no Desktop / transição de foco
+pro WhatsApp Web — nunca a cada troca de foco interna), e (2) ao ir pro
+campo de digitação (Alt+D). Fora isso, o NVDA fica livre pra navegar do
+jeito nativo dele — Escape sai do modo foco normalmente, NVDA+Espaço
+alterna e a escolha É RESPEITADA, e Ctrl+setas passa a navegar por
+palavra dentro de uma mensagem em modo de navegação, igual já funcionava
+na Web. Também ajustado: no WhatsApp Web, o Escape só é redirecionado
+pro navegador quando o foco está no campo de digitação (cancelar
+resposta/edição); em qualquer outro lugar, faz o Escape nativo do NVDA
+(sair do modo foco) — antes ele sempre mandava pro navegador, mesmo
+navegando mensagens, e isso também contribuía pro mesmo problema.</p>
+<h3 id="section-5">1.2.7 (2026-08-11)</h3>
+<p><strong>Aprofundado (pesquisa nos addons originais):</strong>
+comparei o código com os dois addons de origem direto no GitHub —
+<code>whatsAppNG</code> (nunotfc) e <code>whatsAppEnhancer</code>
+(starkrush123/mrido1). Achado 1: o <code>whatsAppNG</code> tem
+exatamente o mesmo watchdog de modo foco que causava o bug da 1.2.6, e
+nem tem como o usuário escapar dele — ou seja, o bug vem de mais longe,
+não foi introduzido na unificação. Achado 2: o
+<code>whatsAppEnhancer</code> já resolveu isso oficialmente com uma
+opção “disable_browse_mode_lock” nas configurações que, quando ligada,
+delega pro comando NATIVO do NVDA
+(<code>globalCommands.commands.script_toggleVirtualBufferPassThrough</code>)
+em vez de só inverter o atributo <code>passThrough</code> na mão — isso
+importa porque o comando nativo sincroniza o cursor de revisão e faz o
+anúncio de modo corretamente, coisas que setar o atributo direto não
+faz.</p>
+<p><strong>Mudanças desta versão:</strong> 1.
+<code>script_toggleBrowseMode</code>/<code>script_toggleBrowseModeWeb</code>
+(NVDA+Espaço) agora chamam o comando nativo do NVDA quando disponível,
+com fallback pro flip manual só se não existir. 2. Nova opção avançada
+nas configurações: “Desativar completamente a trava de modo foco”
+(desligada por padrão) — válvula de escape total, igual ao
+<code>whatsAppEnhancer</code>, pro caso raro do flag dinâmico da 1.2.6
+não bastar. 3. Entendimento de fundo sobre por que isso quebra: o
+WhatsApp Desktop trocou de motor (nativo UWP → WebView2/Electron) no fim
+de 2025, e por dentro passou a se comportar como uma página web. O NVDA
+tem dois modos pra páginas web: <strong>modo de navegação</strong>
+(cursor virtual — as setas andam por TODOS os elementos da árvore de
+acessibilidade “achatada”, inclusive botões aninhados como o de baixar
+arquivo, mesmo que a Microsoft não tenha exposto esse botão como parada
+de Tab) e <strong>modo foco</strong> (as teclas vão direto pro controle,
+só funciona bem em campos de formulário e controles nativos do Windows).
+O modo foco automático deste addon é útil pro campo de digitação e pra
+ler mensagens fluidamente, mas qualquer elemento aninhado que só existe
+na árvore “achatada” da página (não é parada de Tab nativa) só é
+alcançável em modo de navegação — daí a necessidade de deixar o usuário
+escapar pro modo de navegação de propósito, sem o addon reverter
+sozinho.</p>
+<h3 id="section-6">1.2.6 (2026-08-11)</h3>
+<p><strong>Corrigido:</strong> modo foco automático cancelava o
+NVDA+Espaço do próprio usuário. O addon reforçava
+<code>passThrough=True</code> em todo evento de foco e de mudança de
+modo do NVDA, mesmo quando quem tinha acabado de ligar o modo de
+navegação era o usuário — na prática NVDA+Espaço parecia não fazer nada.
+Isso impedia alcançar elementos aninhados dentro de uma mensagem (ex:
+botão de baixar um arquivo/documento) que não são alcançáveis em modo
+foco puro, só em modo de navegação. Corrigido em
+<code>whatsapp_root.py</code> (Desktop) e <code>wa_global.py</code>
+(Web) com uma flag <code>_userWantsBrowseMode</code>: o modo foco
+automático agora respeita a escolha manual do usuário até ele alternar
+de volta (NVDA+Espaço de novo) ou ir para o campo de digitação (Alt+D,
+que já força modo foco de propósito). WhatsApp Web ganhou um script
+próprio de NVDA+Espaço (antes dependia só do padrão do NVDA, que era
+revertido pelo watchdog).</p>
+<hr />
+<h2 id="como-versionar-renomear">Como versionar / renomear</h2>
+<p>O nome interno do addon está em <code>manifest.ini</code> (campo
+<code>name</code>) e em <code>wa_global.py</code> (registro do
+executável). Para renomear:</p>
+<ol type="1">
+<li><code>manifest.ini</code> → alterar <code>name</code>,
+<code>summary</code> e <code>version</code></li>
+<li><code>wa_global.py</code> → alterar <code>scriptCategory</code> e
+título do painel</li>
+<li>Reempacotar: rodar o script abaixo no terminal Windows</li>
+<li>O arquivo instalado em <code>nvda/addons/</code> tem o nome da pasta
+— renomear a pasta também</li>
+</ol>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> zipfile, os</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>output <span class="op">=</span> <span class="vs">r&#39;C:\Users\leodb\Desktop\whatsAppAcessibilidade-1.1.0.nvda-addon&#39;</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>base <span class="op">=</span> <span class="vs">r&#39;C:\Users\leodb\AppData\Roaming\nvda\addons\whatsAppUnified&#39;</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> zipfile.ZipFile(output, <span class="st">&#39;w&#39;</span>, zipfile.ZIP_DEFLATED) <span class="im">as</span> z:</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> root, dirs, files <span class="kw">in</span> os.walk(base):</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> <span class="bu">file</span> <span class="kw">in</span> files:</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>            filepath <span class="op">=</span> os.path.join(root, <span class="bu">file</span>)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>            arcname <span class="op">=</span> os.path.relpath(filepath, base)</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>            z.write(filepath, arcname)</span></code></pre></div>
+<hr />
+<h2 id="versão-atual-1.3.0">Versão atual: 1.3.0</h2>
+<p>Criado em: 2026-04-05 Autor: Leo (baseado em mrido1 e Nuno Costa)</p>
+</body>
+</html>

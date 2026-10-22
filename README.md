@@ -162,6 +162,11 @@ usar primeiro o nome que o próprio WhatsApp publica ("Lista de conversas", "Men
 em LIST ou TABLE — a lista de conversas hoje é publicada como grade. A regra por posição
 ficou só como reserva.
 
+**6. Pacote em ordem para o NVDA 2026.2.** O endereço do projeto entrou no `manifest.ini`
+(antes vazio) e a ajuda do add-on passou a vir dentro do pacote (`doc/pt_BR/readme.html` e
+`doc/en/readme.html`, gerados deste README) — antes o `docFileName` apontava para um
+arquivo que não existia, e o botão de ajuda do NVDA não tinha o que abrir.
+
 ### 1.2.19 (2026-08-14) — Web: desfeita a 1.2.18, corrigido pela raiz
 **O Leo apontou:** a navegação própria por `setFocus()` entre botões-irmãos (1.2.18) não
 resolveu nada — "a mesma coisa ainda". Pediu pra analisar de novo o que o Desktop faz de
