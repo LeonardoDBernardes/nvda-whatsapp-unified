@@ -127,6 +127,19 @@ Registro Windows `UserDuckingPreference=3` aplicado — Windows não mais abaixa
 
 ## Changelog
 
+### 1.4.1 (2026-10-23) — Som de modo de navegação no WhatsApp Web
+
+**1. Sem bipe ao andar nas conversas.** O plugin forçava o modo foco depois que o NVDA já
+tinha decidido o modo daquele item — resultado: o som de modo foco/navegação a cada troca de
+foco, junto com o texto do modo (a lentidão relatada). Agora o modo foco é ajustado uma única
+vez por página, antes de o NVDA tratar o foco, e não é mais mexido. A escolha manual com
+NVDA+Espaço continua valendo.
+
+**2. NVDA+Espaço voltou a funcionar no resto do sistema.** O atalho era capturado pelo addon
+em qualquer programa e repassava Insert+Espaço ao aplicativo em vez de alternar o modo de
+navegação do NVDA. Agora ele chama o comando nativo. No aplicativo WhatsApp, como não existe
+modo de navegação, o addon apenas anuncia "Modo foco".
+
 ### 1.4.0 (2026-10-22) — Robusto contra versões novas, controle de áudio e licença
 
 Esta versão é a resposta à análise dos outros seis addons de WhatsApp da loja do NVDA. O
@@ -524,6 +537,6 @@ with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as z:
 
 ---
 
-## Versão atual: 1.4.0
+## Versão atual: 1.4.1
 Criado em: 2026-04-05
 Autor: Leo (baseado em mrido1 e Nuno Costa)

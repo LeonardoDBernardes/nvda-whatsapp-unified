@@ -1359,7 +1359,12 @@ class AppModule(_BuiltinAppModule):
         obj = api.getFocusObject()
         ti = getattr(obj, "treeInterceptor", None)
         if not ti:
-            gesture.send()
+            # No aplicativo não existe modo de navegação: o módulo desliga a
+            # criação do buffer de propósito (disableBrowseModeByDefault), e o
+            # comando nativo do NVDA, se chamado, criaria um buffer que
+            # atrapalharia a leitura. Antes a tecla era repassada ao WhatsApp;
+            # agora só informa o estado real.
+            ui.message(_("Modo foco"))
             return
         try:
             import globalCommands
@@ -1408,6 +1413,13 @@ def _guard_scope(fn):
 
 
 for _name, _fn in list(AppModule.__dict__.items()):
-    if _name.startswith("script_") and callable(_fn):
+    # NVDA+Espaço é tecla do próprio NVDA: fica fora do escopo. Se o addon
+    # estiver configurado só para o Web, mandar Insert+Espaço ao WhatsApp não
+    # alterna modo nenhum — só entrega a tecla ao aplicativo.
+    if (
+        _name.startswith("script_")
+        and callable(_fn)
+        and _name != "script_toggleBrowseMode"
+    ):
         setattr(AppModule, _name, _guard_scope(_fn))
 del _name, _fn

@@ -19,6 +19,7 @@ import speech
 import ui
 import winUser
 import time
+import weakref
 from scriptHandler import script
 from NVDAObjects.IAccessible import IAccessible
 from NVDAObjects.IAccessible.ia2Web import Ia2Web
@@ -55,6 +56,10 @@ _HINT_RE = re.compile(
     re.IGNORECASE,
 )
 _PHONE_RE = re.compile(r"\+\d[()\d\s-]{8,15}(?=[^\d]|$|\s)")
+# Endereço de site de verdade (ex.: web.whatsapp.com). Serve para separar
+# "o buffer aponta outro site" de "o buffer não tem endereço utilizável" —
+# no segundo caso o título da janela ainda vale como reserva.
+_SITE_RE = re.compile(r"^(?:[a-z0-9-]+\.)+[a-z]{2,}$", re.IGNORECASE)
 
 SCOPE_CHOICES = [
     ("desktop", _("Apenas aplicativo (Desktop)")),
@@ -230,22 +235,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         except Exception:
             pass
 
-    def _has_message_list_ancestor(self, obj):
-        """Mesma convenção do Desktop: a linha de mensagem tem a classe
-        'focusable-list-item' em algum ancestral próximo."""
-        curr = obj
-        for _ in range(7):
-            try:
-                cls = getattr(curr, "IA2Attributes", {}).get("class", "")
-                if "focusable-list-item" in cls:
-                    return True
-                curr = curr.parent
-                if curr is None:
-                    return False
-            except Exception:
-                return False
-        return False
-
     # ── WhatsApp Web — foco e live region sem delay ───────────────────────────
 
     _BROWSER_EXES = frozenset({
@@ -258,17 +247,45 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     _last_lr_time    = 0.0
     _LR_MIN_INTERVAL = 0.35  # segundos mínimos entre anúncios de live region
 
+    # TreeInterceptor cujo modo foco já foi ajustado por este plugin (referência
+    # fraca: o NVDA descarta o TI ao fechar/recarregar a página). Serve para
+    # ajustar UMA vez por documento, em vez de brigar a cada troca de foco.
+    _focus_mode_ti = None
+
+    def _document_site(self, ti):
+        """Devolve o domínio do documento do buffer (ex.: 'web.whatsapp.com'),
+        ou None quando o identificador não é um endereço utilizável. Não dá
+        para exigir sempre uma URL: em elementos UIA o identificador do buffer
+        às vezes é outra coisa, e era aí que a checagem por título era a única
+        saída (regressão da lista de conversas, 12-13/08/2026)."""
+        if ti is None:
+            return None
+        try:
+            url = (getattr(ti, "documentConstantIdentifier", None)
+                   or getattr(ti, "documentUrl", None))
+            if not url:
+                return None
+            site = str(url).strip().lower()
+            if "://" in site:
+                site = site.split("://", 1)[1]
+            site = site.split("/", 1)[0].split("?", 1)[0]
+            if site.count(":") == 1:  # endereço com porta
+                site = site.split(":", 1)[0]
+            if not _SITE_RE.match(site):
+                return None
+            return site
+        except Exception:
+            return None
+
     def _check_whatsapp_web(self, obj):
         """Verifica se obj está num browser com WhatsApp Web aberto de verdade.
-        Confere a URL real do documento (treeInterceptor.documentConstantIdentifier)
-        quando disponível — mais preciso que título de janela, que bate por
-        coincidência (qualquer página com 'whatsapp' no título ativaria as
-        mudanças à toa). MAS a URL só conta como resposta positiva — se não
-        bater (ou nem existir, algo comum pra elementos que usam UIA em vez
-        de IA2, onde esse identificador às vezes não é uma URL de verdade),
-        cai pro título como reserva, em vez de desistir ali. Foi a falta
-        dessa reserva que quebrou o reforço de modo foco especificamente na
-        lista de conversas/mensagens (12-13/08/2026)."""
+        Confere o endereço do documento do buffer quando ele é um endereço de
+        verdade — mais preciso que o título da janela. Se o endereço aponta
+        OUTRO site, a resposta é não (senão uma pesquisa no Google com
+        'whatsapp' no título ativaria o modo foco naquela página). Só quando
+        o buffer não tem endereço utilizável é que o título serve de reserva,
+        que é o caso dos elementos UIA que quebraram a lista de conversas em
+        12-13/08/2026."""
         scope = config.conf.get(CONFIG_SECTION, {}).get("scope", "desktop")
         if scope == "desktop":
             return False
@@ -276,12 +293,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             appName = obj.appModule.appName.lower().replace(".exe", "")
             if appName not in self._BROWSER_EXES:
                 return False
-            ti = getattr(obj, "treeInterceptor", None)
-            if ti:
-                url = (getattr(ti, "documentConstantIdentifier", None)
-                       or getattr(ti, "documentUrl", None))
-                if url and "web.whatsapp.com" in str(url).lower():
-                    return True
+            site = self._document_site(getattr(obj, "treeInterceptor", None))
+            if site is not None:
+                return site == "whatsapp.com" or site.endswith(".whatsapp.com")
             hwnd = winUser.getForegroundWindow()
             title = winUser.getWindowText(hwnd).lower()
             return "whatsapp" in title
@@ -301,14 +315,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             return False
         if self._in_whatsapp_web:
             return True
-        try:
-            ti = getattr(obj, "treeInterceptor", None)
-            url = (getattr(ti, "documentConstantIdentifier", None)
-                   or getattr(ti, "documentUrl", None)) if ti else None
-            if url and "web.whatsapp.com" in str(url).lower():
-                return True
-        except Exception:
-            pass
+        site = self._document_site(getattr(obj, "treeInterceptor", None))
+        if site is not None:
+            return site == "whatsapp.com" or site.endswith(".whatsapp.com")
         try:
             return "whatsapp" in winUser.getWindowText(
                 winUser.getForegroundWindow()).lower()
@@ -385,88 +394,66 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
             except Exception:
                 pass
 
-    # Modo foco automático em duas velocidades, dependendo de ONDE o foco está:
-    # - Andar ENTRE itens de lista (conversas OU mensagens, role 86/29/UNKNOWN
-    #   — SECTION/TABLECELL) OU entre os botões inline de UMA mensagem
-    #   (reagir, responder, encaminhar, "...", tocar áudio, link — qualquer
-    #   BUTTON com ancestral 'focusable-list-item', mesma convenção que o
-    #   Desktop já usa pra achar a linha de mensagem): tudo isso é tratado
-    #   pelo próprio JavaScript do WhatsApp (mesma página nos dois lados —
-    #   Desktop também carrega web.whatsapp.com), então precisa ficar SEMPRE
-    #   em modo foco pra as setas chegarem cruas na página — reforça a cada
-    #   troca de foco. O Desktop não precisa de código nenhum pra isso além
-    #   de manter o modo foco ligado (nenhuma navegação própria) — é
-    #   exatamente esse comportamento que o Web replica aqui.
-    # - Item DENTRO de um submenu que abriu por cima (papel MENUITEM, sem
-    #   ancestral de mensagem): só força modo foco ao ENTRAR no WhatsApp Web
-    #   vindo de outro lugar, nunca de forma reativa depois disso — pra não
-    #   brigar com o Escape nativo do NVDA nem com NVDA+Espaço enquanto o
-    #   usuário explora (isso causava "Enter e depois Esc" pra abrir
-    #   submenus, e travava Ctrl+setas). Esses itens já têm navegação própria
-    #   segura via MessageMenuItemNav (ver classe acima).
+    # Modo foco no WhatsApp Web: ajustado UMA vez por documento, ANTES de o
+    # NVDA processar o foco.
+    #
+    # Por que assim (achado S512, 22/10/2026, relato do Leo: "fica dando o
+    # barulho do NVDA como se eu estivesse usando insert+espaço"): antes este
+    # evento chamava nextHandler() primeiro e só depois forçava
+    # ti.passThrough = True a cada troca de foco. Nesse meio-tempo o NVDA já
+    # tinha decidido o modo pelo item focado e anunciava a troca com o som de
+    # modo foco/navegação; a força posterior deixava o estado "sujo" e o som
+    # voltava na troca seguinte — um bipe a cada item, junto com o texto do
+    # modo de navegação (a lentidão relatada). Ajustando antes do
+    # nextHandler, o NVDA já calcula o foco no modo certo e o anúncio não se
+    # repete. Não se mexe mais no TI depois disso: se o usuário puser modo de
+    # navegação com NVDA+Espaço, a escolha dele vale até recarregar a página.
+    #
+    # _disableAutoPassThrough é atributo PRIVADO de propósito: o setter
+    # público chama _focusLastFocusableObject() e puxaria o foco do usuário.
     def event_gainFocus(self, obj, nextHandler):
-        """Atualiza cache e força modo foco ao chegar no WhatsApp Web, ao
-        andar entre itens de lista (conversas/mensagens) ou entre botões
-        inline de uma mensagem."""
-        nextHandler()
+        """Mantém o cache do WhatsApp Web e, ao entrar num documento dele,
+        deixa o modo foco ligado uma única vez — antes do NVDA tratar o foco."""
         was_in_web = self._in_whatsapp_web
         self._in_whatsapp_web = self._check_whatsapp_web(obj)
         if not self._in_whatsapp_web:
-            return
-        entering_fresh = not was_in_web
-        obj_role = getattr(obj, "role", None)
-        is_list_item = obj_role in (86, 29) or obj_role == controlTypes.Role.UNKNOWN
-        is_inline_msg_button = (
-            obj_role == controlTypes.Role.BUTTON
-            and self._has_message_list_ancestor(obj)
-        )
-        if entering_fresh or is_list_item or is_inline_msg_button:
-            c = config.conf.get(CONFIG_SECTION, {})
-            if c.get("autoFocusMode", True) and not c.get("disableFocusLock", False):
-                ti = getattr(obj, "treeInterceptor", None)
-                if ti and hasattr(ti, "passThrough"):
-                    try:
-                        ti.passThrough = True
-                    except Exception:
-                        # Achado real (S342r/14-08): setar passThrough aqui
-                        # dentro do próprio evento de foco às vezes esbarra
-                        # num objeto de revisão ainda não pronto (NoneType
-                        # sem makeTextInfo) e derruba o evento inteiro,
-                        # cortando o resto do processamento daquele foco no
-                        # meio. Como isso é reforçado a cada troca de foco
-                        # (comentário acima), ignorar aqui e deixar a próxima
-                        # troca de foco tentar de novo é seguro.
-                        pass
+            if was_in_web:
+                # Saiu do WhatsApp Web: esquece o documento anterior.
+                self._focus_mode_ti = None
+            return nextHandler()
 
-    @script(description=_("Alternar modo de navegação (WhatsApp Web)"), gesture="kb:NVDA+space")
-    def script_toggleBrowseModeWeb(self, gesture):
-        """Alterna manualmente o modo de navegação/foco no WhatsApp Web.
-        Fora do WhatsApp Web: replica o atalho padrão do NVDA."""
-        if not self._in_whatsapp_web:
-            gesture.send()
-            return
-        try:
-            obj = api.getFocusObject()
-            ti = getattr(obj, "treeInterceptor", None)
-            if ti and hasattr(ti, "passThrough"):
-                try:
-                    import globalCommands
-                    core_toggle = getattr(
-                        globalCommands.commands, "script_toggleVirtualBufferPassThrough", None)
-                except Exception:
-                    core_toggle = None
-                if core_toggle:
-                    # Usa o comando nativo do NVDA (sincroniza cursor de
-                    # revisão e anuncia o modo corretamente).
-                    core_toggle(gesture)
-                else:
-                    ti.passThrough = not ti.passThrough
-                    state = _("Modo foco") if ti.passThrough else _("Modo de navegação")
-                    ui.message(state)
-                return
-        except Exception:
-            pass
-        gesture.send()
+        c = config.conf.get(CONFIG_SECTION, {})
+        if c.get("autoFocusMode", True) and not c.get("disableFocusLock", False):
+            try:
+                ti = getattr(obj, "treeInterceptor", None)
+                tracked = self._focus_mode_ti
+                if (
+                    ti is not None
+                    and hasattr(ti, "passThrough")
+                    and (tracked is None or tracked() is not ti)
+                ):
+                    ti.passThrough = True
+                    ti._disableAutoPassThrough = True
+                    # Marca só DEPOIS de dar certo. Achado real (S342r/14-08):
+                    # mexer no TI aqui às vezes esbarra num objeto de revisão
+                    # ainda não pronto e o ajuste falha; se o cache fosse
+                    # marcado antes, aquele documento nunca receberia o modo
+                    # foco e o bipe voltaria até recarregar a página.
+                    self._focus_mode_ti = weakref.ref(ti)
+            except Exception:
+                # A próxima troca de foco tenta de novo, e o nextHandler é
+                # chamado de todo jeito.
+                pass
+        nextHandler()
+
+    # Nota (S512, 23/10/2026): NÃO há mais script NVDA+Espaço neste plugin
+    # global. Ele existia só para alternar o modo no WhatsApp Web, mas um
+    # script de plugin global tem prioridade sobre o comando do próprio NVDA
+    # (scriptHandler._yieldObjectsForFindScript: plugins antes de
+    # globalCommands) — e o "gesture.send()" do fallback engolia o
+    # NVDA+Espaço em TODO o sistema, mandando Insert+Espaço ao programa em vez
+    # de alternar browse/foco. Sem o script, quem responde é o comando nativo,
+    # que já funciona no WhatsApp Web e em qualquer página.
 
     @script(description=_("Inspecionar elemento (WhatsApp Web)"), gesture="kb:NVDA+shift+i")
     def script_inspectorWeb(self, gesture):
