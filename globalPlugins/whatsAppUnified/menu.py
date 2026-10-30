@@ -21,20 +21,16 @@ SOLUÇÃO (a 1.4 resolvia no aplicativo com uma navegação própria pelo menu e
 no Web levando o foco item a item; aqui é uma só para os dois):
 - o menu é reconhecido UMA vez por evento de foco, pela cadeia de ancestrais
   do foco que o NVDA já tem pronta (nenhuma chamada nova ao WhatsApp);
-- seta para baixo e para cima: o add-on leva o foco de verdade (``setFocus``)
-  para a opção seguinte ou anterior, então o Enter seguinte vai para ela. Só
-  em modo foco (ou sem buffer, como no aplicativo); em modo de navegação as
-  setas continuam sendo do NVDA. Campo de texto dentro do menu (pesquisa do
-  painel de emojis, por exemplo) fica com as setas;
+- seta para baixo e para cima (desde a 2.0.6): quem anda pelas opções é o
+  próprio WhatsApp (a seta segue para ele); o add-on só age nas pontas. Só em
+  modo foco (ou sem buffer, como no aplicativo); em modo de navegação as setas
+  continuam sendo do NVDA. Campo de texto dentro do menu (pesquisa do painel
+  de emojis, por exemplo) fica com as setas;
 - ao abrir, se o foco caiu numa reação ou no contêiner, vai direto para a
   primeira opção (opção "começar nas opções", ligada por padrão), sem falar
   a reação antes;
 - seta para cima na primeira opção vai para a fileira de reações, se houver:
   reagir continua possível (Esquerda e Direita andam entre as reações);
-- se o WhatsApp não aceitar o foco na opção (o aplicativo às vezes deixa o foco
-  do NVDA no contêiner, por isso a 1.4 andava "por fora" no aplicativo), o
-  add-on fala a opção e guarda a posição; a próxima seta continua dela e o
-  Enter ativa a opção falada.
 - Esc: ver 2.0.3 abaixo.
 2.0.3 (relato do Leo, 30/10/2026, versão 2.0.2: "com as setas o menu foge para a
 mensagem de baixo ou de cima"; "no Web, Espaço e Esc me jogam nas reações";
@@ -59,6 +55,21 @@ mensagem de baixo ou de cima"; "no Web, Espaço e Esc me jogam nas reações";
   fecha o menu: só repete a opção em foco. Sem limite de tempo (2.0.4: na 2.0.3
   eram 1,5 s, e o Leo aperta as teclas em sequência, não juntas); o Esc
   seguinte fecha o menu.
+2.0.6 (relato do Leo, 30/10/2026: "quando chego em Apagar, uma das últimas
+opções, ele muda para a mensagem de baixo"; no Web, em Denunciar):
+- o log mostrou que o menu fechava NO MEIO das opções (nunca chegou à última),
+  uns 300 a 400 ms depois de o add-on levar o foco com ``setFocus``. A 2.0.5
+  (parar na última opção) partiu de um diagnóstico errado e foi desfeita;
+- o menu de opções (WDSMenu > BaseMenu > FocusGroup, código de 29/10/2026) já
+  anda com as setas sozinho, com o foco preso dentro dele (``wrap``). As setas
+  só tinham sido tomadas pelo add-on na 2.0.2 por causa do Esc que caía no
+  modo de navegação, resolvido na 2.0.3;
+- AGORA: a seta vai para o WhatsApp. O add-on só age nas pontas: seta para
+  baixo na última opção fica nela (sem dar a volta, pedido do Leo), seta para
+  cima na primeira vai à barra de reações (Shift+Tab). Se a lista de opções
+  não ficou completa no prazo, a seta vai para o WhatsApp na dúvida;
+- o log diz em que opção cada seta estava ("menu-seta baixo 9/11"), para achar
+  onde o menu fecha se ainda fechar.
 """
 
 import api
@@ -67,7 +78,7 @@ import speech
 from controlTypes import OutputReason
 
 from . import diag, settings
-from .tree import Role, State, iter_children, safe_role, safe_states, walk
+from .tree import Role, State, iter_children, safe_role, safe_states, walk, walk_all
 
 MENU_ROLES = frozenset((Role.POPUPMENU, Role.MENU))
 MENU_ITEM_ROLES = frozenset(
@@ -83,7 +94,6 @@ MENU_SEARCH_LEVELS = 7
 ITEM_BUDGET = 200
 ITEM_SECONDS = 0.15
 CHECK_DELAY_MS = 300
-MOVE_CHECK_MS = 120  # tempo para o foco chegar à opção antes de andar "por fora"
 TRAY_DELAY_MS = 150  # a barra de reações acabou de abrir: espera o WhatsApp assentar antes do Tab
 # Botões da barra de reações (as reações têm ``aria-pressed``: botão de alternar).
 TRAY_BUTTON_ROLES = frozenset(r for r in (Role.BUTTON, Role.TOGGLEBUTTON) if r is not None)
@@ -93,8 +103,6 @@ class _Menu:
 	container = None  # contêiner do menu em que o foco está (ou None)
 	tray = False  # o contêiner é a barra de reações (pop-up separado, só botões)
 	tray_seen = False  # a barra de reações apareceu desde que o menu abriu
-	virtual = None  # opção falada "por fora" (o foco não foi para ela)
-	virtual_from = None  # onde o foco estava quando a opção foi falada
 	habit_esc = False  # o add-on levou o foco às opções e nenhuma tecla do menu veio ainda
 
 
@@ -103,17 +111,11 @@ def reset():
 	_Menu.tray = False
 	_Menu.tray_seen = False
 	_Menu.habit_esc = False
-	_forget_virtual()
 
 
 def in_tray():
 	"""O foco está na barra de reações (pop-up separado do menu de opções)?"""
 	return _Menu.container is not None and _Menu.tray
-
-
-def _forget_virtual():
-	_Menu.virtual = None
-	_Menu.virtual_from = None
 
 
 def active():
@@ -140,29 +142,35 @@ def _usable_item(obj, roles):
 
 
 def items_of(container):
-	"""As opções do menu, na ordem da tela. Reações e separadores ficam de fora.
+	"""As opções do menu, na ordem da tela (ver ``items_state``)."""
+	return items_state(container)[0]
+
+
+def items_state(container):
+	"""As opções do menu, na ordem da tela, e se a lista está completa.
+
+	Reações e separadores ficam de fora.
 
 	Menu novo: os itens com papel de item de menu. Menu antigo: os filhos
 	diretos (papel botão) do próprio contêiner ou da lista ``ul`` dele; as
 	reações ficam mais fundo, dentro de um div, e não entram.
 	"""
 	if container is None:
-		return []
-	found = walk(
+		return [], True
+	found, complete = walk_all(
 		container,
 		lambda o: _usable_item(o, MENU_ITEM_ROLES),
 		budget=ITEM_BUDGET,
 		seconds=ITEM_SECONDS,
 		skip=lambda o: safe_role(o) in MENU_ITEM_ROLES,
-		first=False,
 	)
 	if found:
-		return found
+		return found, complete
 	for holder in [container] + _list_children(container):
 		items = [child for child in iter_children(holder, 60) if _usable_item(child, LIST_ITEM_ROLES)]
 		if items:
-			return items
-	return []
+			return items, True
+	return [], True
 
 
 def is_menu_container(obj):
@@ -225,47 +233,6 @@ def _index(items, obj):
 	return -1
 
 
-# "Volte à barra de reações": a barra é outro pop-up, só o Shift+Tab do WhatsApp chega lá.
-BACK_TO_TRAY = object()
-
-
-def target_for(direction, focus=None):
-	"""A opção que deve receber o foco com seta para baixo (1) ou para cima (-1), ou None.
-
-	Seta para cima na primeira opção: a fileira de reações de dentro do menu
-	(menu antigo), ou BACK_TO_TRAY se a barra de reações separada apareceu,
-	senão a última opção.
-	"""
-	container = _Menu.container
-	items = items_of(container)
-	if not items:
-		return None
-	if focus is None:
-		focus = api.getFocusObject()
-	index = _index(items, focus)
-	if direction > 0:
-		return items[index + 1] if 0 <= index < len(items) - 1 else items[0]
-	if index > 0:
-		return items[index - 1]
-	if index == 0:
-		return tray_first(container, items) or (BACK_TO_TRAY if _Menu.tray_seen else items[-1])
-	return items[-1]
-
-
-def _current(focus):
-	"""A opção atual: a falada "por fora", se o foco ainda está onde estava; senão o foco."""
-	if _Menu.virtual is not None and focus is not None and _Menu.virtual_from == focus:
-		return _Menu.virtual
-	return focus
-
-
-def virtual_target(focus):
-	"""A opção falada "por fora" que o Enter deve ativar, ou None."""
-	if _Menu.container is None or _Menu.virtual is None or focus is None:
-		return None
-	return _Menu.virtual if _Menu.virtual_from == focus else None
-
-
 def _focus_mode(focus):
 	"""Modo foco (ou sem buffer, como no aplicativo sem modo de navegação)?"""
 	try:
@@ -302,6 +269,12 @@ def _send(name):
 
 
 def move(direction, gesture):
+	"""Seta para baixo (1) ou para cima (-1) num menu do WhatsApp.
+
+	Quem anda pelas opções é o próprio WhatsApp (a seta segue para ele); o
+	add-on só age nas pontas, para o menu não dar a volta, e na ida e volta
+	entre as opções e a barra de reações.
+	"""
 	_Menu.habit_esc = False  # o usuário já anda pelo menu: o próximo Esc fecha
 	if _Menu.tray:
 		# Barra de reações: Esquerda e Direita andam pelas reações (do WhatsApp);
@@ -312,50 +285,42 @@ def move(direction, gesture):
 		else:
 			gesture.send()
 		return
+	container = _Menu.container
 	focus = api.getFocusObject()
-	current = _current(focus)
-	target = target_for(direction, current)
-	if target is None:
-		gesture.send()
+	items, complete = items_state(container)
+	index = _index(items, focus)
+	diag.act(
+		"menu-seta",
+		"%s %d/%d%s" % ("baixo" if direction > 0 else "cima", index + 1, len(items), "" if complete else "+"),
+		key="menu-seta:%d:%d" % (direction, index),
+	)
+	if direction < 0 and index == 0:
+		reaction = tray_first(container, items)
+		if reaction is not None:  # menu antigo: a fileira de reações fica dentro dele
+			try:
+				reaction.setFocus()
+			except Exception:
+				gesture.send()
+			return
+		if _Menu.tray_seen:
+			diag.act("menu-volta-barra", "")
+			_send("shift+tab")
+			return
+		_at_edge(focus)
 		return
-	if target is BACK_TO_TRAY:
-		diag.act("menu-volta-barra", "")
-		_forget_virtual()
-		_send("shift+tab")
+	if direction > 0 and complete and items and index == len(items) - 1:
+		_at_edge(focus)
 		return
-	diag.act("menu-seta", "%s %s" % ("baixo" if direction > 0 else "cima", diag.role_name(target)), key="menu-seta:%d" % id(target))
+	gesture.send()
+
+
+def _at_edge(obj):
+	"""Ponta do menu: o foco fica onde está e a opção é repetida (sem dar a volta)."""
+	diag.act("menu-ponta", "")
 	try:
-		target.setFocus()
+		speech.speakObject(obj, reason=OutputReason.FOCUS)
 	except Exception:
 		pass
-	core.callLater(MOVE_CHECK_MS, _check_followed, focus, target)
-
-
-def _check_followed(origin, target):
-	"""O foco não foi para a opção? Anda "por fora": fala a opção e guarda a posição."""
-	try:
-		if api.getFocusObject() != origin:
-			return  # o foco andou: o NVDA já falou a opção
-		_Menu.virtual = target
-		_Menu.virtual_from = origin
-		diag.act("menu-por-fora", diag.describe(target))
-		speech.speakObject(target, reason=OutputReason.FOCUS)
-	except Exception:
-		pass
-
-
-def activate(gesture):
-	"""Enter com uma opção falada "por fora": ativa essa opção."""
-	_Menu.habit_esc = False
-	target = virtual_target(api.getFocusObject())
-	if target is None:
-		gesture.send()
-		return
-	_forget_virtual()
-	try:
-		target.doAction()
-	except Exception:
-		gesture.send()
 
 
 def escape(gesture):
@@ -413,7 +378,6 @@ def handle_gain_focus(obj, nextHandler):
 	a reação. Devolve True se tratou o evento (não chame ``nextHandler`` de novo).
 	"""
 	previous = _Menu.container
-	_forget_virtual()  # foco de verdade mudou: a posição "por fora" não vale mais
 	container = container_of(obj)
 	_Menu.container = container
 	if container is None:

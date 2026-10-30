@@ -1,4 +1,4 @@
-"""2.0.2: relatos do Leo de 30/10/2026.
+"""2.0.2: relatos do Leo de 30/10/2026 (setas revistas na 2.0.6: vao para o WhatsApp).
 
 - a mensagem real e uma linha (TABLEROW) que nao aceita foco com um div focavel (SECTION)
   dentro; o foco do NVDA fica no div. A 2.0.1 so reconhecia a linha, entao os comandos da
@@ -147,7 +147,8 @@ def test_option_off_keeps_whatsapp_choice(plugin):
 	assert menu.active() is container  # as setas continuam do add-on
 
 
-def test_down_and_up_arrows_walk_the_options_and_up_on_the_first_goes_to_the_reactions(plugin):
+def test_down_and_up_arrows_go_to_whatsapp_and_up_on_the_first_goes_to_the_reactions(plugin):
+	"""2.0.6: quem anda pelas opcoes e o proprio WhatsApp; o add-on so age nas pontas."""
 	page = real_page()
 	focus(page.composer)
 	container, tray, items = open_menu(page)
@@ -156,13 +157,11 @@ def test_down_and_up_arrows_walk_the_options_and_up_on_the_first_goes_to_the_rea
 	script = plugin.getScript(down)
 	assert script is not None
 	script(down)
-	assert api.getFocusObject() is items[1] and down.sent == 0
-	deliver(plugin, items[1])
-	plugin.getScript(down)(down)
-	assert api.getFocusObject() is items[2]
+	assert down.sent == 1 and items[1].focus_calls == 0  # a seta foi para o WhatsApp
 	deliver(plugin, items[2])
+	down = Gesture("downArrow")
 	plugin.getScript(down)(down)
-	assert api.getFocusObject() is items[0]  # volta ao inicio, nunca escorrega para a mensagem
+	assert down.sent == 0 and api.getFocusObject() is items[2]  # para na ultima, sem dar a volta
 	deliver(plugin, items[0])
 	up = Gesture("upArrow")
 	plugin.getScript(up)(up)
@@ -213,7 +212,7 @@ def test_new_menu_with_menu_items(plugin):
 	deliver(plugin, items[0])
 	down = Gesture("downArrow")
 	plugin.getScript(down)(down)
-	assert api.getFocusObject() is items[1]
+	assert down.sent == 1  # o WhatsApp anda
 
 
 def test_leaving_the_menu_releases_the_arrows(plugin):
@@ -236,56 +235,8 @@ def test_menu_without_buffer_also_gets_the_arrows(plugin):
 	assert items[1].treeInterceptor is None
 	down = Gesture("downArrow")
 	plugin.getScript(down)(down)
-	assert api.getFocusObject() is items[2]
-
-
-# ─── reserva: o WhatsApp nao aceita o foco na opcao (como a 1.4 tratava o aplicativo) ──
-
-def test_when_focus_does_not_follow_the_option_is_spoken_and_enter_activates_it(plugin):
-	page = real_page()
-	focus(page.composer)
-	container, tray, items = open_menu(page)
-	deliver(plugin, items[0])
-	for item in items:
-		item.setFocus = lambda: None  # o foco fica onde estava
-	down = Gesture("downArrow")
-	plugin.getScript(down)(down)
-	core.run_pending()
-	assert any(kind == "object" and obj is items[1] for kind, obj, *_ in speech.spoken)
-	plugin.getScript(down)(down)  # continua da opcao falada, nao do foco
-	core.run_pending()
-	assert any(kind == "object" and obj is items[2] for kind, obj, *_ in speech.spoken)
-	enter = Gesture("enter")
-	script = plugin.getScript(enter)
-	assert script is not None
-	script(enter)
-	assert items[2].actions == [0] and enter.sent == 0
-
-
-def test_enter_is_native_when_the_focus_followed(plugin):
-	page = real_page()
-	focus(page.composer)
-	container, tray, items = open_menu(page)
-	deliver(plugin, items[0])
-	down = Gesture("downArrow")
-	plugin.getScript(down)(down)
-	core.run_pending()
-	assert api.getFocusObject() is items[1]
-	assert plugin.getScript(Gesture("enter")) is None  # Enter vai direto para o WhatsApp
-
-
-def test_a_real_focus_change_forgets_the_spoken_option(plugin):
-	page = real_page()
-	focus(page.composer)
-	container, tray, items = open_menu(page)
-	deliver(plugin, items[0])
-	keep = items[1].setFocus
-	items[1].setFocus = lambda: None
-	down = Gesture("downArrow")
-	plugin.getScript(down)(down)
-	core.run_pending()
-	assert menu.virtual_target(items[0]) is items[1]
-	items[1].setFocus = keep
+	assert down.sent == 1
 	deliver(plugin, items[2])
-	assert menu.virtual_target(items[2]) is None
-	assert plugin.getScript(Gesture("enter")) is None
+	down = Gesture("downArrow")
+	plugin.getScript(down)(down)
+	assert down.sent == 0  # na ultima opcao: para

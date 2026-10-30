@@ -1,4 +1,4 @@
-# WhatsApp Unificado 2.0.4 — acessibilidade do WhatsApp para o NVDA
+# WhatsApp Unificado 2.0.6 — acessibilidade do WhatsApp para o NVDA
 
 Add-on do NVDA para o **WhatsApp Desktop** (o aplicativo da Microsoft Store, que usa WebView2) e para o **WhatsApp Web** (Chrome, Edge, Brave e outros navegadores baseados em Chromium).
 
@@ -107,6 +107,18 @@ O WhatsApp monta e desmonta linhas à medida que você rola (as listas são virt
 
 Também ajuda no seguinte: depois do Alt+Tab as mensagens ficam sem nome no WhatsApp; o add-on lê o texto das partes da mensagem quando o nome vem vazio.
 
+## O que mudou na 2.0.6 (as setas do menu voltam a ser do WhatsApp)
+
+Relato do Leo com a 2.0.5 (30/10/2026): no aplicativo, descendo pelo menu da mensagem, ao chegar em **Apagar** (uma das últimas opções) o foco ia para a mensagem de baixo; no Web, em **Denunciar**. O menu só deveria fechar com o Esc.
+
+O que o log do NVDA mostrou: o menu fechava **no meio** das opções, nunca na última, uns 300 a 400 milissegundos depois de o add-on levar o foco para a opção seguinte por conta própria. A 2.0.5 (parar na última opção) tinha partido de um diagnóstico errado e foi **desfeita**.
+
+No código do WhatsApp, o menu de opções já anda com as setas sozinho e mantém o foco dentro dele. O add-on tinha tomado as setas na 2.0.2 por causa do Esc que jogava o NVDA no modo de navegação, problema resolvido na 2.0.3.
+
+1. **As setas para cima e para baixo vão para o WhatsApp** dentro do menu, como o WhatsApp foi feito para funcionar com o teclado.
+2. **Na última opção a seta para baixo para** e repete a opção (sem voltar ao início). Na primeira opção, a seta para cima vai para a barra de reações, como antes.
+3. **Diagnóstico**: o log diz em que opção cada seta estava (por exemplo `menu-seta baixo 9/11`). Se o menu ainda fechar sozinho, dá para ver exatamente onde.
+
 ## O que mudou na 2.0.4 (Esc de costume sem limite de tempo)
 
 O Leo confirmou o jeito dele (30/10/2026): abre o menu com **Espaço e depois Esc**, uma tecla depois da outra; o **segundo Esc** fecha o menu; com o menu fechado, **mais um Esc** volta para a lista de conversas. Na 2.0.3 o primeiro Esc só ficava no menu se viesse em até 1,5 segundo, e quem aperta as teclas com calma podia ter o menu fechado logo de cara.
@@ -129,7 +141,7 @@ Relatos do Leo com a 2.0.2 (30/10/2026): "andando com as setas no menu da mensag
 1. **Espaço abre direto nas opções.** Quando o foco cai na barra de reações, o add-on manda o Tab do WhatsApp e o foco chega à primeira opção, sem falar a reação. Não é mais preciso apertar Esc depois do Espaço.
 2. **Esc dentro de um menu do WhatsApp vai para o WhatsApp**: fecha o menu e volta à mensagem, **sem som e sem modo de navegação**, no Web e no aplicativo. (O NVDA já faz isso com itens de menu de páginas; o add-on estende a regra à barra de reações e ao menu da mensagem.)
 3. **Costume "Espaço e depois Esc"**: se o Esc vier logo depois de o menu abrir (antes de qualquer seta; sem limite de tempo desde a 2.0.4), ele não fecha o menu, só repete a opção em foco. O Esc seguinte fecha.
-4. **Setas presas ao menu**: para baixo e para cima andam só pelas opções, voltando ao início no fim. Seta para cima na primeira opção volta à barra de reações (Esquerda e Direita andam entre as reações); seta para baixo na barra volta às opções. Se por algum motivo o foco cair num menu em modo de navegação, o Web volta sozinho ao modo foco.
+4. **Setas presas ao menu**: para baixo e para cima andam só pelas opções (desde a 2.0.6 é o próprio WhatsApp quem anda; o add-on só faz parar na última opção). Seta para cima na primeira opção volta à barra de reações (Esquerda e Direita andam entre as reações); seta para baixo na barra volta às opções. Se por algum motivo o foco cair num menu em modo de navegação, o Web volta sozinho ao modo foco.
 5. **Mensagem reconhecida sem demora**: a 2.0.2 procurava o campo de digitação para saber se uma linha era mensagem, e isso custava 400 a 600 ms por mensagem no log do Leo (e às vezes falhava, deixando os comandos da mensagem sem agir). Agora basta subir alguns níveis: a lista de conversas tem nome, o painel das mensagens é o bloco que recebe foco.
 6. **Diagnóstico do menu**: com o log ligado, aparecem linhas `menu-entrou` (com a cadeia de papéis, nunca textos), `menu-barra-para-opcoes`, `menu-seta`, `menu-esc`, `menu-esc-costume`, `menu-saiu` e `linha tipo=...`. Se o menu ainda fugir, o log mostra para onde e por quê.
 
@@ -139,7 +151,7 @@ Relatos do Leo com a 2.0.1 (30/10/2026) e o que foi achado no código do WhatsAp
 
 1. **Os comandos da mensagem voltaram a valer.** O foco do NVDA fica num bloco dentro da linha da mensagem, não na linha; a 2.0.x só reconhecia a linha, então Ctrl+C, Shift+Enter, Ctrl+R e os outros não agiam. Agora o bloco é reconhecido e os comandos procuram os botões na linha dele. O mesmo vale para a lista de conversas e para Alt+2.
 2. **Menu da mensagem começa em Responder, não nas reações.** O WhatsApp pôs uma fileira de reações no topo do menu e, para quem usa teclado, põe o foco na primeira reação. O add-on leva o foco à primeira opção sem falar a reação (opção nova, ligada por padrão).
-3. **Setas no menu não escorregam mais para a mensagem de baixo.** Dentro de um menu, em modo foco, seta para baixo e para cima andam só pelas opções (voltando ao início no fim). Seta para cima na primeira opção vai para as reações. Se o WhatsApp não aceitar o foco na opção, o add-on fala a opção e o Enter a ativa (como a 1.4 fazia no aplicativo). Em modo de navegação e em campo de texto as setas continuam do NVDA.
+3. **Setas no menu não escorregam mais para a mensagem de baixo.** Dentro de um menu, em modo foco, seta para baixo e para cima andam só pelas opções (na 2.0.6 as setas voltaram a ser do WhatsApp; veja "O que mudou na 2.0.6"). Seta para cima na primeira opção vai para as reações. Se o WhatsApp não aceitar o foco na opção, o add-on fala a opção e o Enter a ativa (como a 1.4 fazia no aplicativo). Em modo de navegação e em campo de texto as setas continuam do NVDA.
 4. **Esc nativo de novo no Web** (seção do modo foco).
 5. **Espaço, tecla Aplicativos e F10 contam como teclas que mudam o foco de propósito**: a recuperação de foco não puxa mais o foco de volta para a mensagem enquanto o menu abre (no aplicativo o Espaço tinha deixado de abrir o menu).
 6. **Diagnóstico de lentidão**: com o log ligado, toda vez que o próprio add-on gasta mais de 100 ms (escolha de classe, evento de foco, comando, painel do aplicativo), o log mostra uma linha `lento ... N ms`. Assim dá para separar o atraso do add-on do atraso do WhatsApp, do Chrome ou do NVDA.
@@ -242,7 +254,7 @@ whatsapp-unified/
 ```
 python3 -m pytest tests                  # testes com o NVDA simulado
 python3 tests/check_nvda_api.py          # confere cada API contra o código-fonte do NVDA 2026.2
-./build.sh                               # gera whatsAppUnified-2.0.4.nvda-addon
+./build.sh                               # gera whatsAppUnified-2.0.6.nvda-addon
 ```
 
 Os stubs de `tests/stubs/` reproduzem fielmente o trecho de `browseMode.py` que decide o modo e toca o som; o teste de controle prova que, sem o add-on, o som toca no mesmo percurso de foco.
@@ -259,4 +271,4 @@ Este add-on é **GPL versão 2** (arquivo `COPYING`). Ele nasceu da união de do
 
 O código do NVDA 2026.2 (NV Access, GPL-2) foi a referência de cada API usada.
 
-Versão atual: **2.0.4**.
+Versão atual: **2.0.6**.

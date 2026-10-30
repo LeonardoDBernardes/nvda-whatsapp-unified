@@ -144,30 +144,42 @@ def walk(root, predicate, budget=DEFAULT_BUDGET, seconds=DEFAULT_SECONDS, skip=N
 	menor entre ``seconds`` a partir de agora e ``deadline`` (instante absoluto,
 	para vários passos de um mesmo comando dividirem o mesmo tempo).
 	"""
+	found, _complete = _bfs(root, predicate, budget, seconds, skip, first, deadline)
+	if first:
+		return found[0] if found else None
+	return found
+
+
+def walk_all(root, predicate, budget=DEFAULT_BUDGET, seconds=DEFAULT_SECONDS, skip=None):
+	"""Como ``walk(first=False)``, mais se a busca foi até o fim (sem estourar prazo nem limite)."""
+	return _bfs(root, predicate, budget, seconds, skip, False, None)
+
+
+def _bfs(root, predicate, budget, seconds, skip, first, deadline):
 	if root is None:
-		return None if first else []
+		return [], True
 	found = []
 	queue = [root]
 	index = 0
 	limit = time.monotonic() + seconds
 	if deadline is not None:
 		limit = min(limit, deadline)
-	while index < len(queue) and index < budget:
-		if time.monotonic() > limit:
-			break
+	while index < len(queue):
+		if index >= budget or time.monotonic() > limit:
+			return found, False
 		obj = queue[index]
 		index += 1
 		try:
 			if predicate(obj):
-				if first:
-					return obj
 				found.append(obj)
+				if first:
+					return found, True
 			if skip is not None and skip(obj):
 				continue
 		except Exception:
 			continue
 		queue.extend(iter_children(obj))
-	return None if first else found
+	return found, True
 
 
 def ancestors(obj, limit=12):

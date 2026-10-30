@@ -32,7 +32,6 @@ _MENU_ARROWS = {
 	inputCore.normalizeGestureIdentifier("kb:downArrow"): "menuNext",
 	inputCore.normalizeGestureIdentifier("kb:upArrow"): "menuPrevious",
 }
-_MENU_ENTER = inputCore.normalizeGestureIdentifier("kb:enter")
 # Esc num menu do WhatsApp vai para o WhatsApp, sem o NVDA trocar de modo (ver menu.py).
 _MENU_ESCAPE = inputCore.normalizeGestureIdentifier("kb:escape")
 
@@ -91,7 +90,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		return found
 
 	def _menu_arrow(self, gesture):
-		"""Nome do script do menu (setas, Esc; Enter só com opção falada "por fora"), ou None."""
+		"""Nome do script do menu (setas, Esc), ou None."""
 		try:
 			identifiers = gesture.normalizedIdentifiers
 		except Exception:
@@ -105,15 +104,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 					return None
 				if self._in_whatsapp() and menu.handles_arrows(focus):
 					return name
-				return None
-			if identifier == _MENU_ENTER:
-				# Enter só é do add-on com uma opção falada "por fora" (ver menu.py).
-				try:
-					focus = api.getFocusObject()
-				except Exception:
-					return None
-				if menu.virtual_target(focus) is not None and self._in_whatsapp():
-					return "menuActivate"
 				return None
 			if identifier == _MENU_ESCAPE:
 				# Esc num menu do WhatsApp: para o WhatsApp, sem o NVDA trocar de modo.
@@ -134,10 +124,6 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	@diag.scripted
 	def script_menuPrevious(self, gesture):
 		menu.move(-1, gesture)
-
-	@diag.scripted
-	def script_menuActivate(self, gesture):
-		menu.activate(gesture)
 
 	@diag.scripted
 	def script_menuEscape(self, gesture):

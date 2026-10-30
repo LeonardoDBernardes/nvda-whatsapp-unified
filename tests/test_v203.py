@@ -139,14 +139,31 @@ def test_option_off_stays_on_the_reactions(plugin):
 
 # ─── setas: nunca saem do menu ──────────────────────────────────────────────
 
-def test_arrows_walk_the_options_and_wrap_never_leaving_the_menu(plugin, monkeypatch):
+def test_arrows_go_to_whatsapp_and_stop_at_the_last(plugin):
+	"""2.0.6: o add-on levava o foco com setFocus e o menu fechava perto do fim; agora a seta vai ao WhatsApp."""
 	page = real_page()
 	bar, reactions, options_menu, items = open_and_land(plugin, page)
-	for expected in (items[1], items[2], items[0]):
+	keyboardHandler.sent.clear()
+	for current in (items[0], items[1]):
+		deliver(plugin, current)
 		script, gesture = press(plugin, "downArrow")
-		assert script is not None and gesture.sent == 0
-		assert api.getFocusObject() is expected
-		deliver(plugin, expected)
+		assert script is not None and gesture.sent == 1
+	deliver(plugin, items[2])
+	spoken = len(speech.spoken)
+	script, gesture = press(plugin, "downArrow")
+	assert gesture.sent == 0 and keyboardHandler.sent == []
+	assert all(item.focus_calls == 0 for item in items[1:])  # nenhum setFocus nas opcoes
+	assert speech.spoken[spoken:] and speech.spoken[-1][1] is items[2]  # repete a ultima
+
+
+def test_incomplete_list_never_blocks_the_arrow(plugin, monkeypatch):
+	"""Lista de opcoes cortada pelo prazo: na duvida a seta vai ao WhatsApp."""
+	page = real_page()
+	bar, reactions, options_menu, items = open_and_land(plugin, page)
+	monkeypatch.setattr(menu, "items_state", lambda container: (items[:2], False))
+	deliver(plugin, items[1])
+	script, gesture = press(plugin, "downArrow")
+	assert gesture.sent == 1
 
 
 def test_down_on_the_reaction_bar_goes_to_the_options(plugin):
@@ -170,15 +187,15 @@ def test_up_on_the_first_option_goes_back_to_the_reaction_bar(plugin):
 	assert keyboardHandler.sent == ["shift+tab"] and gesture.sent == 0
 
 
-def test_up_on_the_first_option_without_a_bar_goes_to_the_last(plugin):
+def test_up_on_the_first_option_without_a_bar_stays_on_the_first(plugin):
 	page = real_page()
 	start_on_message(plugin, page)
 	items = [Node(Role.MENUITEM, o, states={State.FOCUSABLE}) for o in ("A", "B", "C")]
 	popup = Node(Role.POPUPMENU, "", children=items)
 	page.doc.add(popup)
 	deliver(plugin, items[0])
-	press(plugin, "upArrow")
-	assert api.getFocusObject() is items[2]
+	script, gesture = press(plugin, "upArrow")
+	assert gesture.sent == 0 and api.getFocusObject() is items[0]
 	assert keyboardHandler.sent == []
 
 

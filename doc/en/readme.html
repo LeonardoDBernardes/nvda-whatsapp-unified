@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>WhatsApp Unified 2.0.4</title>
+  <title>WhatsApp Unified 2.0.6</title>
   <style>
     html {
       color: #1a1a1a;
@@ -166,10 +166,10 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">WhatsApp Unified 2.0.4</h1>
+<h1 class="title">WhatsApp Unified 2.0.6</h1>
 </header>
-<h1 id="whatsapp-unified-204--whatsapp-accessibility-for-nvda">WhatsApp
-Unified 2.0.4 — WhatsApp accessibility for NVDA</h1>
+<h1 id="whatsapp-unified-206--whatsapp-accessibility-for-nvda">WhatsApp
+Unified 2.0.6 — WhatsApp accessibility for NVDA</h1>
 <p>NVDA add-on for <strong>WhatsApp Desktop</strong> (the Microsoft
 Store app, which uses WebView2) and for <strong>WhatsApp Web</strong>
 (Chrome, Edge, Brave and other Chromium-based browsers).</p>
@@ -479,6 +479,31 @@ normally.</li>
 <p>It also helps with this: after Alt+Tab, messages lose their names in
 WhatsApp; the add-on reads the text of the message parts when the name
 comes back empty.</p>
+<h2 id="what-changed-in-206-menu-arrows-belong-to-whatsapp-again">What
+changed in 2.0.6 (menu arrows belong to WhatsApp again)</h2>
+<p>Leo's report on 2.0.5 (30/10/2026): in the app, going down the
+message menu, on <strong>Apagar</strong> (Delete, one of the last
+options) focus went to the message below; on the Web, on
+<strong>Denunciar</strong> (Report). The menu should only close with
+Esc.</p>
+<p>What the NVDA log showed: the menu closed <strong>in the
+middle</strong> of the options, never on the last one, about 300 to 400
+milliseconds after the add-on moved focus to the next option on its own.
+2.0.5 (stop at the last option) came from a wrong diagnosis and was
+<strong>reverted</strong>.</p>
+<p>In WhatsApp's code, the options menu already moves with the arrows by
+itself and keeps focus inside. The add-on had taken the arrows in 2.0.2
+because of the Esc that threw NVDA into browse mode, fixed in 2.0.3.</p>
+<ol type="1">
+<li><strong>Up and down arrows go to WhatsApp</strong> inside the menu,
+the way WhatsApp was built to work with the keyboard.</li>
+<li><strong>On the last option, down arrow stops</strong> and repeats
+the option (no wrapping). On the first option, up arrow goes to the
+reaction bar, as before.</li>
+<li><strong>Diagnostics</strong>: the log says which option each arrow
+was on (e.g. <code>menu-seta baixo 9/11</code>). If the menu still
+closes by itself, it shows exactly where.</li>
+</ol>
 <h2 id="what-changed-in-204-habit-esc-without-a-time-limit">What changed
 in 2.0.4 (habit Esc without a time limit)</h2>
 <p>Leo confirmed his way of working (30/10/2026): he opens the menu with
@@ -533,10 +558,11 @@ bar and the message menu.)</li>
 opens (before any arrow; no time limit since 2.0.4) does not close the
 menu; it repeats the focused option. The next Esc closes it.</li>
 <li><strong>Arrows stay in the menu</strong>: down and up walk only the
-options, wrapping at the end. Up on the first option goes back to the
-reaction bar (Left and Right walk the reactions); down on the bar
-returns to the options. If focus ever lands on a menu in browse mode,
-the Web returns to focus mode by itself.</li>
+options (since 2.0.6 WhatsApp itself moves; the add-on only stops at the
+last option). Up on the first option goes back to the reaction bar (Left
+and Right walk the reactions); down on the bar returns to the options.
+If focus ever lands on a menu in browse mode, the Web returns to focus
+mode by itself.</li>
 <li><strong>Messages recognised without delay</strong>: 2.0.2 searched
 for the message field to tell whether a row was a message, which cost
 400 to 600 ms per message in Leo's log (and sometimes failed, leaving
@@ -566,10 +592,11 @@ moves focus to the first option without speaking the reaction (new
 option, on by default).</li>
 <li><strong>Arrows in the menu no longer slip to the message
 below.</strong> Inside a menu, in focus mode, down and up arrow walk
-only the options (wrapping at the end). Up arrow on the first option
-goes to the reactions. If WhatsApp refuses focus on the option, the
-add-on speaks it and Enter activates it (as 1.4 did in the app). In
-browse mode and in text fields the arrows stay NVDA's.</li>
+only the options (in 2.0.6 the arrows went back to WhatsApp; see "What
+changed in 2.0.6"). Up arrow on the first option goes to the reactions.
+If WhatsApp refuses focus on the option, the add-on speaks it and Enter
+activates it (as 1.4 did in the app). In browse mode and in text fields
+the arrows stay NVDA's.</li>
 <li><strong>Native Esc again on the Web</strong> (focus mode
 section).</li>
 <li><strong>Space, the Applications key and F10 count as keys that move
@@ -795,7 +822,7 @@ tolerated.</p>
 └── build.sh           builds the .nvda-addon</code></pre>
 <pre><code>python3 -m pytest tests                  # tests with a simulated NVDA
 python3 tests/check_nvda_api.py          # checks every API against the NVDA 2026.2 source
-./build.sh                               # builds whatsAppUnified-2.0.4.nvda-addon</code></pre>
+./build.sh                               # builds whatsAppUnified-2.0.6.nvda-addon</code></pre>
 <p>The stubs in <code>tests/stubs/</code> faithfully reproduce the part
 of <code>browseMode.py</code> that decides the mode and plays the sound;
 the control test proves that, without the add-on, the sound plays over
@@ -826,6 +853,6 @@ control, Portuguese documentation, the 2.0 rewrite.</li>
 </ol>
 <p>The NVDA 2026.2 code (NV Access, GPL-2) was the reference for every
 API used.</p>
-<p>Current version: <strong>2.0.4</strong>.</p>
+<p>Current version: <strong>2.0.6</strong>.</p>
 </body>
 </html>
