@@ -24,13 +24,14 @@ from scriptHandler import script
 
 import addonHandler
 
-from . import messagetext, settings
+from . import diag, messagetext, settings
 from .context import (
 	BROWSER_APPS,
 	app_name_of,
 	is_web_document,
 	row_kind,
-	web_verdict,
+	web_overlay_allowed,
+	wa_context,
 	APP_NAME,
 )
 from .tree import CELL_ROLES, ROW_ROLES, State, is_defunct, safe_role
@@ -93,7 +94,9 @@ class MessageRow(NVDAObject):
 		Quem decide se há player, texto ou botão é o próprio script, que, se não
 		for o caso, repassa a tecla com ``gesture.send()`` (local à linha).
 		"""
-		if settings.scope_allows(self._wa_ctx):
+		# Só vale com o foco confirmado no WhatsApp (contexto do último evento de
+		# foco): uma sobreposição que ficou num objeto de outra página não age.
+		if wa_context(self) == self._wa_ctx:
 			try:
 				identifiers = gesture.normalizedIdentifiers
 			except Exception:
@@ -105,6 +108,7 @@ class MessageRow(NVDAObject):
 		return super().getScript(gesture)
 
 	@script(description=_("Tocar ou pausar mensagem de voz ou vídeo"))
+	@diag.scripted
 	def script_playMessage(self, gesture):
 		target = messagetext.play_target(self)
 		if target is None:
@@ -113,6 +117,7 @@ class MessageRow(NVDAObject):
 		target.doAction()
 
 	@script(description=_("Pausar ou retomar o áudio da mensagem"))
+	@diag.scripted
 	def script_audioToggle(self, gesture):
 		buttons, slider = messagetext.find_player(self)
 		if slider is None:
@@ -121,6 +126,7 @@ class MessageRow(NVDAObject):
 		(buttons[-1] if buttons else slider).doAction()
 
 	@script(description=_("Aumentar ou diminuir a velocidade do áudio"))
+	@diag.scripted
 	def script_audioSpeed(self, gesture):
 		target = messagetext.speed_target(self)
 		if target is None:
@@ -129,6 +135,7 @@ class MessageRow(NVDAObject):
 		target.doAction()
 
 	@script(description=_("Menu de contexto da mensagem"))
+	@diag.scripted
 	def script_contextMenu(self, gesture):
 		button = messagetext.menu_button(self)
 		if button is not None:
@@ -139,6 +146,7 @@ class MessageRow(NVDAObject):
 		KeyboardInputGesture.fromName("applications").send()
 
 	@script(description=_("Reagir à mensagem"))
+	@diag.scripted
 	def script_reactMessage(self, gesture):
 		button = messagetext.react_button(self)
 		if button is None:
@@ -147,6 +155,7 @@ class MessageRow(NVDAObject):
 		button.doAction()
 
 	@script(description=_("Ler mensagem completa"))
+	@diag.scripted
 	def script_readFull(self, gesture):
 		def speak(text):
 			ui.message(text if text else _("Texto não encontrado"))
@@ -154,6 +163,7 @@ class MessageRow(NVDAObject):
 		messagetext.expand_then(self, speak)
 
 	@script(description=_("Abrir mensagem em modo de navegação"))
+	@diag.scripted
 	def script_browseMessage(self, gesture):
 		def show(text):
 			if text:
@@ -164,6 +174,7 @@ class MessageRow(NVDAObject):
 		messagetext.expand_then(self, show)
 
 	@script(description=_("Abrir mensagem em janela de texto"))
+	@diag.scripted
 	def script_textWindow(self, gesture):
 		def show(text):
 			if not text:
@@ -176,6 +187,7 @@ class MessageRow(NVDAObject):
 		messagetext.expand_then(self, show)
 
 	@script(description=_("Copiar mensagem"))
+	@diag.scripted
 	def script_copyMessage(self, gesture):
 		if self._has_selection():
 			# Há texto selecionado: o Ctrl+C é da página (copia só a seleção).
@@ -324,6 +336,7 @@ def choose_overlay_classes(obj, clsList, contexts):
 
 		if ctx == "app" and getattr(obj, "windowClassName", "") == HOST_PANE_CLASS:
 			clsList.insert(0, HostPane)
+			diag.act("overlay", "classe=HostPane " + diag.describe(obj))
 			return
 
 		if not isinstance(obj, IAccessible):
@@ -332,11 +345,13 @@ def choose_overlay_classes(obj, clsList, contexts):
 		if ctx == "web" and any(issubclass(c, chromium.Document) for c in clsList):
 			if is_web_document(obj):
 				clsList.insert(0, WhatsAppWebDocument)
+				diag.act("overlay", "classe=WhatsAppWebDocument " + diag.describe(obj))
 			return
 
-		# Objeto de navegador: só com o documento confirmado como web.whatsapp.com
-		# pelo ENDEREÇO (consulta guardada por janela; nada de título nem de varredura).
-		if ctx == "web" and not web_verdict(obj):
+		# Objeto de navegador: só se o foco ATUAL já foi confirmado como
+		# web.whatsapp.com (pelo endereço, no evento de foco) e o objeto é da mesma
+		# janela. Comparação barata: nenhuma chamada ao navegador, em nenhum site.
+		if ctx == "web" and not web_overlay_allowed(obj):
 			return
 
 		try:
@@ -345,6 +360,7 @@ def choose_overlay_classes(obj, clsList, contexts):
 			is_popup = False
 		if is_popup:
 			clsList.insert(0, SelectionPopup)
+			diag.act("overlay", "classe=SelectionPopup " + diag.describe(obj))
 			return
 
 		role = safe_role(obj)
@@ -354,6 +370,46 @@ def choose_overlay_classes(obj, clsList, contexts):
 				clsList.insert(0, ChatListRow)
 			elif kind == "message":
 				clsList.insert(0, MessageRow)
+			if kind in ("chat", "message"):
+				diag.act("overlay", "classe=%s %s" % (clsList[0].__name__, diag.describe(obj)))
 	except Exception:
 		# Escolher classe nunca pode quebrar a criação do objeto.
+		return
+
+
+_upgraded = {}
+
+
+def upgrade_focus_object(obj):
+	"""O objeto de foco da ENTRADA no WhatsApp nasceu antes de o contexto ser confirmado.
+
+	O NVDA cria o objeto de foco antes do evento de foco; na primeira vez que o
+	foco chega ao WhatsApp Web o contexto ainda não existia e a linha ficou sem
+	sobreposição. Aqui (já confirmado, uma vez por entrada) ela recebe a classe,
+	do mesmo jeito que o NVDA muda a classe de um objeto recém-criado. Qualquer
+	dúvida: não faz nada.
+	"""
+	try:
+		if getattr(obj, "wa_kind", None) or not isinstance(obj, IAccessible):
+			return
+		role = safe_role(obj)
+		if role not in ROW_ROLES and role not in CELL_ROLES:
+			return
+		kind = row_kind(obj)
+		overlay = {"chat": ChatListRow, "message": MessageRow}.get(kind)
+		if overlay is None:
+			return
+		base = type(obj)
+		if issubclass(base, overlay):
+			return
+		new = _upgraded.get((base, overlay))
+		if new is None:
+			new = type("Dynamic_%s%s" % (overlay.__name__, base.__name__), (overlay, base), {"__module__": __name__})
+			_upgraded[(base, overlay)] = new
+		obj.__class__ = new
+		init = overlay.__dict__.get("initOverlayClass")
+		if init is not None:
+			init(obj)
+		diag.act("overlay", "classe=%s (na entrada) %s" % (overlay.__name__, diag.describe(obj)))
+	except Exception:
 		return

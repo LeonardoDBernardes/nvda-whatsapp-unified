@@ -35,12 +35,14 @@ def test_url_is_whatsapp(url, expected):
 
 def test_web_whatsapp_page_is_web_context():
 	page = Page()
+	focus(page.composer)
 	assert context.raw_context(page.msg_rows[0]) == "web"
 	assert context.wa_context(page.composer) == "web"
 
 
 def test_other_site_is_no_context_even_with_whatsapp_in_the_title():
 	page = Page(url="https://www.example.com/", title="WhatsApp clone - Google Chrome")
+	focus(page.composer)
 	assert context.raw_context(page.msg_rows[0]) is None
 	assert context.wa_context(page.composer) is None
 
@@ -48,6 +50,7 @@ def test_other_site_is_no_context_even_with_whatsapp_in_the_title():
 def test_uia_identifier_never_falls_back_to_the_window_title():
 	"""Sem endereco utilizavel NAO se adivinha pelo titulo (isso disparava varreduras)."""
 	page = Page(url="uia:AutomationId-7", title="(3) WhatsApp - Microsoft Edge")
+	focus(page.composer)
 	assert context.raw_context(page.msg_rows[0]) is None
 	assert context.wa_context(page.composer) is None
 
@@ -55,6 +58,7 @@ def test_uia_identifier_never_falls_back_to_the_window_title():
 def test_institutional_and_faq_pages_are_no_context():
 	for url in ("https://faq.whatsapp.com/", "https://www.whatsapp.com/", "https://whatsapp.com/"):
 		page = Page(url=url)
+		focus(page.composer)
 		assert context.raw_context(page.msg_rows[0]) is None, url
 		assert context.wa_context(page.composer) is None, url
 
@@ -62,13 +66,16 @@ def test_institutional_and_faq_pages_are_no_context():
 def test_desktop_app_module_is_app_context():
 	app = FakeApp("whatsapp.root", isWhatsAppUnified=True)
 	obj = Node(Role.TABLEROW, "x", app=app)
+	focus(obj)
 	assert context.raw_context(obj) == "app"
 	builtin = Node(Role.TABLEROW, "x", app=FakeApp("whatsapp.root"))
+	focus(builtin)
 	assert context.raw_context(builtin) == "app"
 
 
 def test_unrelated_application_is_no_context():
 	obj = Node(Role.TABLEROW, "x", app=FakeApp("notepad"))
+	focus(obj)
 	assert context.raw_context(obj) is None
 	assert context.raw_context(Node(Role.TABLEROW, "x")) is None
 
@@ -78,12 +85,15 @@ def test_scope_is_respected():
 	import config
 
 	page = Page()
+	focus(page.composer)
 	section = config.conf[settings.CONFIG_SECTION]
 	section["scope"] = "desktop"
 	assert context.wa_context(page.msg_rows[0]) is None
 	section["scope"] = "web"
 	assert context.wa_context(page.msg_rows[0]) == "web"
 	app = Node(Role.TABLEROW, "x", app=FakeApp("whatsapp.root", isWhatsAppUnified=True))
+	focus(app)
+	section["scope"] = "web"
 	assert context.wa_context(app) is None
 	section["scope"] = "both"
 	assert context.wa_context(app) == "app"
@@ -92,18 +102,34 @@ def test_scope_is_respected():
 def test_verdict_is_per_document_not_global():
 	whats = Page()
 	other = Page(url="https://www.example.com/")
+	focus(whats.composer)
 	assert context.raw_context(whats.msg_rows[0]) == "web"
-	assert context.raw_context(other.msg_rows[0]) is None
+	assert context.raw_context(other.msg_rows[0]) is None  # outra janela/documento
 	assert context.raw_context(whats.msg_rows[1]) == "web"
+	focus(other.composer)
+	assert context.raw_context(whats.msg_rows[0]) is None  # o foco saiu do WhatsApp
+	assert context.raw_context(other.msg_rows[0]) is None
 
 
-def test_in_whatsapp_foreground_follows_the_focus():
+def test_context_follows_focus_events_and_is_none_before_any_event():
 	whats = Page()
 	other = Page(url="https://www.example.com/")
+	assert context.active() is None
+	focus(whats.composer, event=False)  # o NVDA moveu o foco, o evento ainda nao chegou
+	assert context.active() is None and context.raw_context(whats.composer) is None
 	focus(whats.composer)
-	assert context.in_whatsapp_foreground() is True
+	assert context.active() == "web" and context.wa_context() == "web"
 	focus(other.composer)
-	assert context.in_whatsapp_foreground() is False
+	assert context.active() is None and context.wa_context() is None
+
+
+def test_stale_context_is_ignored_when_the_nvda_focus_moved_on():
+	"""Foco novo ainda sem evento: o contexto antigo nao vale para ele."""
+	whats = Page()
+	focus(whats.composer)
+	assert context.wa_context() == "web"
+	focus(whats.msg_rows[0], event=False)
+	assert context.wa_context() is None and context.raw_context(whats.msg_rows[0]) is None
 
 
 def test_is_web_document_checks_the_url_only():
@@ -161,12 +187,29 @@ def test_find_document_of_other_objects_climbs_only_a_few_parents():
 	assert context.find_document(page.msg_rows[0].lastChild) is page.doc
 
 
-def test_verdict_is_cached_per_window_and_refreshes_when_the_address_changes():
+def test_there_is_no_per_window_verdict_two_tabs_in_one_window():
+	"""Duas abas na MESMA janela: depois do WhatsApp, a outra aba nao herda o veredito."""
+	from controlTypes import Role
+
+	whats = Page()
+	focus(whats.composer)
+	assert context.wa_context() == "web"
+	other_doc = Node(Role.DOCUMENT, "Outra aba", hwnd=whats.doc.windowHandle, app=whats.app)
+	other_doc.IAccessibleObject = type(whats.doc.IAccessibleObject)("https://www.google.com/")
+	other_field = other_doc.add(Node(Role.EDITABLETEXT, "Pesquisar"))
+	focus(other_field)  # mesma janela (hwnd igual) do WhatsApp
+	assert other_field.windowHandle == whats.composer.windowHandle
+	assert context.raw_context() is None
+	assert context.raw_context(other_field) is None
+	assert context.raw_context(whats.msg_rows[0]) is None
+
+
+def test_address_change_is_seen_at_the_next_focus_event():
 	page = Page()
+	focus(page.composer)
 	assert context.raw_context(page.msg_rows[0]) == "web"
 	page.doc.IAccessibleObject.url = "https://www.example.com/"
-	assert context.raw_context(page.msg_rows[1]) == "web"  # ainda dentro da validade curta
-	context.forget_web()
+	focus(page.msg_rows[1])
 	assert context.raw_context(page.msg_rows[1]) is None
 
 

@@ -12,6 +12,28 @@ _ids = itertools.count(1)
 _hwnds = itertools.count(1000)
 
 
+class ComLog:
+	"""Conta o acesso ao "COM" dos objetos falsos (pai, filhos, vizinhos, IAccessibleObject, accValue)."""
+
+	active = False
+	calls = []
+
+	@classmethod
+	def start(cls):
+		cls.calls = []
+		cls.active = True
+
+	@classmethod
+	def stop(cls):
+		cls.active = False
+		return list(cls.calls)
+
+	@classmethod
+	def note(cls, what):
+		if cls.active:
+			cls.calls.append(what)
+
+
 class FakeApp:
 	def __init__(self, appName, isWhatsAppUnified=False):
 		self.appName = appName
@@ -24,6 +46,7 @@ class FakeAccessible:
 		self.url = url
 
 	def accValue(self, child):
+		ComLog.note("accValue")
 		if self.url is None:
 			raise OSError("sem endereco")
 		return self.url
@@ -36,7 +59,7 @@ class Node(IAccessible):
 		self.role = role
 		self.name = name
 		self.states = set(states)
-		self.parent = None
+		self._parent = None
 		self._children = []
 		self._app = app
 		self.windowHandle = hwnd
@@ -52,6 +75,26 @@ class Node(IAccessible):
 		self.location = None
 		for child in children:
 			self.add(child)
+
+	@property
+	def parent(self):
+		ComLog.note("parent")
+		return self._parent
+
+	@parent.setter
+	def parent(self, value):
+		self._parent = value
+
+	@property
+	def IAccessibleObject(self):
+		ComLog.note("IAccessibleObject")
+		if getattr(self, "_iao", None) is None:
+			raise AttributeError("IAccessibleObject")
+		return self._iao
+
+	@IAccessibleObject.setter
+	def IAccessibleObject(self, value):
+		self._iao = value
 
 	def _set_hwnd(self, hwnd):
 		self.windowHandle = hwnd
@@ -74,21 +117,24 @@ class Node(IAccessible):
 		while node is not None:
 			if node._app is not None:
 				return node._app
-			node = node.parent
+			node = node._parent  # o NVDA conhece o programa pelo processo: nao e COM
 		return None
 
 	@property
 	def firstChild(self):
+		ComLog.note("firstChild")
 		return self._children[0] if self._children else None
 
 	@property
 	def lastChild(self):
+		ComLog.note("lastChild")
 		return self._children[-1] if self._children else None
 
 	def _sibling(self, step):
-		if self.parent is None:
+		ComLog.note("sibling")
+		if self._parent is None:
 			return None
-		siblings = self.parent._children
+		siblings = self._parent._children
 		index = siblings.index(self) + step
 		return siblings[index] if 0 <= index < len(siblings) else None
 
@@ -190,13 +236,33 @@ class Page:
 		self.doc.add(side)
 		self.doc.add(self.main)
 
+	def attach(self, ti):
+		"""O buffer (tree interceptor) do documento: como no NVDA, todo objeto da pagina o encontra."""
+		def walk(node):
+			node.treeInterceptor = ti
+			for child in node._children:
+				walk(child)
+
+		walk(self.doc)
+		return ti
+
 	def overlay_all(self, contexts=frozenset({"web"})):
+		focus(self.composer)  # o evento de foco ja confirmou o WhatsApp Web
 		for row in self.chat_rows + self.msg_rows:
 			apply_overlays(row, contexts)
 		return self
 
 
-def focus(obj):
-	"""Poe o foco no objeto (sem gerar evento)."""
+def focus(obj, event=True):
+	"""Poe o foco no objeto.
+
+	``event=True`` imita o que o plugin global faz na primeira linha do evento de
+	foco (``context.update_focus``). ``event=False``: foco do NVDA mudou, mas o
+	evento ainda nao chegou ao add-on.
+	"""
 	api.setFocusObject(obj)
+	if event:
+		from globalPlugins.whatsAppUnified import context
+
+		context.update_focus(obj)
 	return obj

@@ -24,8 +24,8 @@ import re
 
 import api
 
-from . import settings
-from .context import wa_context
+from . import diag, settings
+from .context import active, wa_context
 from .tree import safe_name
 
 PHONE = r"\+\d[()\d\s-]{8,15}"
@@ -113,6 +113,8 @@ def filter_item(item, kind, name):
 
 def on_speech_sequence(speechSequence):
 	"""Handler de ``filter_speechSequence``: devolve a sequência filtrada."""
+	if active() is None:  # foco fora do WhatsApp: não faz nada, sem COM
+		return speechSequence
 	try:
 		if not any(isinstance(item, str) for item in speechSequence):
 			return speechSequence
@@ -122,7 +124,7 @@ def on_speech_sequence(speechSequence):
 		# O tipo vem da classe de sobreposição do objeto em foco. Sem tipo
 		# (campo de digitação, botão...) nada é filtrado.
 		kind = getattr(focus, "wa_kind", None)
-		if kind not in ("chat", "message") or wa_context(focus) is None:
+		if kind not in ("chat", "message") or wa_context() is None:
 			return speechSequence
 		name = safe_name(focus)
 		result = []
@@ -132,6 +134,7 @@ def on_speech_sequence(speechSequence):
 				new = filter_item(item, kind, name)
 				if new != item:
 					changed = True
+					diag.act("fala-filtrada", "tipo=%s tamanho %d -> %d" % (kind, len(item), len(new)))
 					if not new:
 						continue
 				result.append(new)

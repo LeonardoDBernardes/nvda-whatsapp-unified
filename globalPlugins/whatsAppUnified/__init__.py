@@ -19,7 +19,7 @@ from logHandler import log
 from scriptHandler import script
 from speech.extensions import filter_speechSequence
 
-from . import filters, messagetext, overlays, recovery, settings, tree
+from . import context, diag, filters, messagetext, overlays, recovery, settings, tree, webmode
 from .context import document_url, find_document, forget_kinds, forget_web, raw_context, wa_context
 
 addonHandler.initTranslation()
@@ -35,6 +35,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		settings.add_panel()
 		filter_speechSequence.register(filters.on_speech_sequence)
 		recovery.reset()
+		diag.reset()
 		recovery.register_keys()
 
 	def terminate(self):
@@ -44,6 +45,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		# Solta referências a objetos do WhatsApp e vereditos guardados (a recarga
 		# do NVDA+Ctrl+F3 cria um pacote novo; nada pode ficar apontando para o velho).
 		overlays.reset_page_memory()
+		webmode.forget_entry()
 		forget_web()
 		forget_kinds()
 		settings.remove_panel()
@@ -61,6 +63,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		global do NVDA. O mapa deste plugin só tem os nossos comandos, então não
 		há nada nativo para "devolver" aqui.
 		"""
+		if context.active() is None:  # foco fora do WhatsApp: nada a fazer, sem COM
+			return None
 		found = super().getScript(gesture)
 		if found is None:
 			return None
@@ -71,7 +75,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	@staticmethod
 	def _in_whatsapp():
 		try:
-			return wa_context(api.getFocusObject()) is not None
+			return wa_context() is not None
 		except Exception:
 			return False
 
@@ -88,9 +92,29 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 	def chooseNVDAObjectOverlayClasses(self, obj, clsList):
 		# O lado "app" é escolhido pelo módulo do aplicativo; aqui só o Web.
+		# Para programa que não é navegador, ``choose_overlay_classes`` sai na
+		# primeira linha (só lê o nome do programa).
 		overlays.choose_overlay_classes(obj, clsList, {"web"})
 
 	def event_gainFocus(self, obj, nextHandler):
+		# Primeira coisa: decidir, UMA vez, onde o foco está. Fora do WhatsApp e
+		# fora de um navegador isto lê só o nome do programa (sem COM) e o
+		# evento segue intacto.
+		was_web = context.active() == "web"
+		kind = context.update_focus(obj)
+		if kind is None:
+			if was_web:
+				webmode.restore_last_mode()
+				diag.act("contexto", "saiu do WhatsApp Web", key="contexto:saiu")
+			nextHandler()
+			return
+		if kind == "web" and not was_web:
+			diag.act("contexto", "WhatsApp Web confirmado " + diag.describe(obj), key="contexto:web")
+			overlays.upgrade_focus_object(obj)
+		elif kind == "app":
+			if was_web:
+				webmode.restore_last_mode()
+			diag.act("contexto", "aplicativo do WhatsApp " + diag.describe(obj), key="contexto:app")
 		called = []
 
 		def deliver():
@@ -99,7 +123,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 		handled = False
 		try:
-			if wa_context(obj) is not None:
+			if wa_context() is not None:
 				overlays.note_page_focus(obj)
 				handled = recovery.handle_gain_focus(obj, deliver)
 		except Exception:
@@ -111,6 +135,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	# ─── comandos globais ────────────────────────────────────────────────────
 
 	@script(description=_("Ir para lista de conversas"), gesture="kb:alt+1")
+	@diag.scripted
 	def script_goToChatList(self, gesture):
 		container = tree.find_chat_list(self._root(), tree.new_deadline())
 		if container is None:
@@ -120,6 +145,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		target.setFocus()
 
 	@script(description=_("Ir para lista de mensagens"), gesture="kb:alt+2")
+	@diag.scripted
 	def script_goToMessageList(self, gesture):
 		container = tree.find_message_list(self._root(), tree.new_deadline())
 		if container is None:
@@ -132,6 +158,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		container.setFocus()
 
 	@script(description=_("Ir para campo de digitação"), gesture="kb:alt+d")
+	@diag.scripted
 	def script_focusComposer(self, gesture):
 		composer = tree.find_composer(self._root(), deadline=tree.new_deadline())
 		if composer is None:
@@ -140,6 +167,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		composer.setFocus()
 
 	@script(description=_("Abrir menu de chamada"), gesture="kb:shift+alt+c")
+	@diag.scripted
 	def script_openCallMenu(self, gesture):
 		button = messagetext.call_button(self._root(), tree.new_deadline())
 		if button is None:
@@ -148,6 +176,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		button.doAction()
 
 	@script(description=_("Alternar filtro de números de telefone"), gesture="kb:control+shift+e")
+	@diag.scripted
 	def script_togglePhoneFilter(self, gesture):
 		value = not settings.get("filterMessageList")
 		settings.put("filterMessageList", value)
@@ -155,6 +184,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		ui.message(_("Filtro de telefone {state}").format(state=state))
 
 	@script(description=_("Alternar filtro de dicas de uso"), gesture="kb:NVDA+shift+h")
+	@diag.scripted
 	def script_toggleHintsFilter(self, gesture):
 		value = not settings.get("filterUsageHints")
 		settings.put("filterUsageHints", value)
@@ -163,6 +193,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 	# Sem gesto padrão: o usuário atribui em Gestos de entrada, se quiser.
 	@script(description=_("Inspecionar elemento do WhatsApp (papel, nome, estados, endereço)"))
+	@diag.scripted
 	def script_inspector(self, gesture):
 		obj = api.getFocusObject()
 		try:

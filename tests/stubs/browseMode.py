@@ -21,21 +21,38 @@ sounds = []  # arquivos de som que o NVDA tocaria, em ordem
 calls = []  # toda chamada a reportPassThrough: (modo, onlyIfChanged)
 
 
+class _Reporter:
+	"""reportPassThrough do NVDA. ``writes`` guarda toda escrita EXTERNA em ``.last`` (as do add-on)."""
+
+	def __init__(self):
+		self._last = False
+		self.writes = []
+
+	@property
+	def last(self):
+		return self._last
+
+	@last.setter
+	def last(self, value):
+		self.writes.append(value)
+		self._last = value
+
+	def __call__(self, treeInterceptor, onlyIfChanged=True):
+		calls.append((treeInterceptor.passThrough, onlyIfChanged))
+		if not onlyIfChanged or treeInterceptor.passThrough != self._last:
+			if config.conf["virtualBuffers"]["passThroughAudioIndication"]:
+				sounds.append("focusMode.wav" if treeInterceptor.passThrough else "browseMode.wav")
+			self._last = treeInterceptor.passThrough  # escrita do proprio NVDA: nao entra em ``writes``
+
+
+reportPassThrough = _Reporter()
+
+
 def reset():
 	sounds.clear()
 	calls.clear()
-	reportPassThrough.last = False
-
-
-def reportPassThrough(treeInterceptor, onlyIfChanged=True):
-	calls.append((treeInterceptor.passThrough, onlyIfChanged))
-	if not onlyIfChanged or treeInterceptor.passThrough != reportPassThrough.last:
-		if config.conf["virtualBuffers"]["passThroughAudioIndication"]:
-			sounds.append("focusMode.wav" if treeInterceptor.passThrough else "browseMode.wav")
-		reportPassThrough.last = treeInterceptor.passThrough
-
-
-reportPassThrough.last = False
+	reportPassThrough._last = False
+	reportPassThrough.writes.clear()
 
 
 class BrowseModeTreeInterceptor(AutoPropertyObject):

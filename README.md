@@ -1,4 +1,4 @@
-# WhatsApp Unificado 2.0.0 — acessibilidade do WhatsApp para o NVDA
+# WhatsApp Unificado 2.0.1 — acessibilidade do WhatsApp para o NVDA
 
 Add-on do NVDA para o **WhatsApp Desktop** (o aplicativo da Microsoft Store, que usa WebView2) e para o **WhatsApp Web** (Chrome, Edge, Brave e outros navegadores baseados em Chromium).
 
@@ -60,6 +60,7 @@ NVDA → Preferências → Configurações → **WhatsApp Unificado**. Valem na 
 | Remover "Talvez" antes de nomes de contato | Sim | "Talvez João" vira "João", só no nome da conversa ou no remetente da mensagem. Nunca dentro do texto de uma mensagem. |
 | Manter o modo foco automaticamente no WhatsApp Web, sem som de troca de modo | Sim | Liga a parte descrita na próxima seção. |
 | Recuperar o foco quando o WhatsApp o perde | Sim | Liga a recuperação de foco. |
+| Registrar ações no log do NVDA (diagnóstico) | Sim (nesta versão de teste) | Escreve no log do NVDA (nível INFO, abra com NVDA+F1) uma linha começando com `WhatsAppUnificado:` sempre que o add-on age: sobreposição aplicada, foco adiado ou recuperado, script executado, fala filtrada, modo foco fixado ou solto. No máximo uma linha por ação a cada 2 segundos e 200 linhas por sessão. Nunca grava o texto de mensagens, só o papel do objeto e o tamanho do texto. |
 
 A opção antiga `disableFocusLock` (1.x) foi incorporada em "Manter o modo foco automaticamente". Se ela estava ligada no seu `nvda.ini`, a 2.0 respeita isso até você salvar o painel novo.
 
@@ -104,6 +105,16 @@ O WhatsApp monta e desmonta linhas à medida que você rola (as listas são virt
 4. Se não achar nada, fala o foco original. No máximo **uma recuperação por segundo**: nunca entra em laço.
 
 Também ajuda no seguinte: depois do Alt+Tab as mensagens ficam sem nome no WhatsApp; o add-on lê o texto das partes da mensagem quando o nome vem vazio.
+
+## O que mudou na 2.0.1 (isolamento)
+
+Relato do Leo com a 2.0.0: "ele está influenciando outras janelas". Causa e correção:
+
+1. **Sem veredito por janela.** A 2.0.0 guardava por 2 segundos "esta janela é o WhatsApp Web". No Chrome as abas e a interface do navegador dividem janelas, então outras abas pareciam WhatsApp logo depois de você sair dele. Agora o contexto é calculado **uma vez por evento de foco**, pelo endereço do documento em foco (`web.whatsapp.com`), e vale só para aquele foco.
+2. **Escolha de sobreposição barata e estrita.** Em objeto de navegador só se escolhe sobreposição se o foco atual já foi confirmado no WhatsApp Web e o objeto é da mesma janela. Nenhuma chamada ao navegador por objeto, em nenhum site. O primeiro objeto ao entrar no WhatsApp (criado antes do evento de foco) recebe a sobreposição no próprio evento de foco.
+3. **Todo gancho global sai na primeira linha** quando o foco não está no WhatsApp: fala (`filter_speechSequence`), teclas (`decide_handleRawKey`, `getScript`), objetos (`chooseNVDAObjectOverlayClasses`) e foco (`event_gainFocus`). Fora do WhatsApp o add-on não lê nada além do nome do programa.
+4. **Modo foco e `reportPassThrough.last`.** O add-on só escreve nele com o foco dentro do WhatsApp Web e, ao sair, devolve o valor de antes de entrar (uma vez), para trocar de aba soar como no NVDA puro. O buffer nunca fixa o modo por suposição: sem endereço confirmado ele nasce solto, e o documento confere o endereço de novo ao escolher o buffer.
+5. **Diagnóstico no log** (opção nova, acima), para mostrar exatamente quando o add-on age.
 
 ## O que mudou na 2.0 e por quê
 
@@ -193,7 +204,7 @@ whatsapp-unified/
 ```
 python3 -m pytest tests                  # testes com o NVDA simulado
 python3 tests/check_nvda_api.py          # confere cada API contra o código-fonte do NVDA 2026.2
-./build.sh                               # gera whatsAppUnified-2.0.0.nvda-addon
+./build.sh                               # gera whatsAppUnified-2.0.1.nvda-addon
 ```
 
 Os stubs de `tests/stubs/` reproduzem fielmente o trecho de `browseMode.py` que decide o modo e toca o som; o teste de controle prova que, sem o add-on, o som toca no mesmo percurso de foco.
@@ -210,4 +221,4 @@ Este add-on é **GPL versão 2** (arquivo `COPYING`). Ele nasceu da união de do
 
 O código do NVDA 2026.2 (NV Access, GPL-2) foi a referência de cada API usada.
 
-Versão atual: **2.0.0**.
+Versão atual: **2.0.1**.

@@ -100,6 +100,7 @@ def test_message_row_outside_its_scope_returns_what_nvda_would_return_without_th
 	"""Fora do escopo a linha devolve o script NATIVO da mesma tecla, nao None."""
 	page = Page()
 	row = row_with_native_binding(page)
+	focus(row)
 	config.conf[settings.CONFIG_SECTION]["scope"] = "desktop"  # o web saiu do escopo
 	script_found = row.getScript(Gesture("control+c"))
 	assert script_found is not None and script_found.__name__ == "script_nativeCopy"
@@ -136,6 +137,7 @@ def test_message_row_get_script_never_walks_the_tree():
 	page.msg_list.add(row)
 	row.__class__ = type(type(row))("ForcedRow", (overlays.MessageRow, type(row)), {})
 	row.initOverlayClass()
+	focus(row)
 	for key in ("enter", "alt+p", "control+s", "shift+enter", "control+shift+enter", "control+r", "alt+enter", "alt+c", "control+c"):
 		found = row.getScript(Gesture(key))
 		assert found is not None, key

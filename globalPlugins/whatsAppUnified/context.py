@@ -8,9 +8,10 @@ TODO objeto de navegador):
 - o WhatsApp Web só é reconhecido pelo ENDEREÇO do documento (web.whatsapp.com).
   O título da janela NÃO é usado: ele deixava qualquer aba chamada "WhatsApp"
   disparar varreduras;
-- o veredito é guardado por tree interceptor (conferindo se o endereço mudou) e
-  por janela (hwnd) com validade curta, então objetos criados em seguida custam
-  uma consulta a dicionário;
+- o contexto do foco é calculado UMA vez por evento de foco (``update_focus``,
+  chamado pelo plugin global) e guardado; todo gancho global começa por
+  ``active()`` e sai sem COM quando o foco não está no WhatsApp. NÃO há
+  veredito por janela (abas e a interface do navegador compartilham janelas);
 - a classificação de linhas é guardada por contêiner.
 """
 
@@ -123,16 +124,11 @@ def find_document(obj, limit=6):
 	return None
 
 
-# ─── veredito do WhatsApp Web ────────────────────────────────────────────────
+# ─── onde está o foco? (calculado UMA vez por evento de foco) ────────────────
 
 # Por tree interceptor (referência fraca): (endereço, veredito). Vale só
 # enquanto o endereço é o mesmo: se o buffer navegar para outro site, recalcula.
 _ti_cache = weakref.WeakKeyDictionary()
-# Por janela (hwnd): (instante, veredito, conhecido). Validade curta.
-_hwnd_cache = {}
-_HWND_TTL_KNOWN = 2.0
-_HWND_TTL_UNKNOWN = 0.5
-_HWND_MAX = 64
 
 
 def ti_verdict(ti):
@@ -158,50 +154,26 @@ def ti_verdict(ti):
 	return verdict
 
 
-def _remember_hwnd(hwnd, verdict, known=True):
-	if len(_hwnd_cache) >= _HWND_MAX:
-		_hwnd_cache.clear()
-	_hwnd_cache[hwnd] = (time.monotonic(), verdict, known)
+class _Focus:
+	"""O contexto do foco ATUAL. Só ``update_focus`` (evento de foco) escreve aqui.
+
+	Nunca há veredito por janela: duas abas do Chrome, a barra de endereço e as
+	abas do navegador compartilham janelas, e um veredito por janela faria
+	outras páginas parecerem WhatsApp. O veredito é do DOCUMENTO em foco.
+	"""
+
+	kind = None  # "app", "web" ou None (sem olhar o escopo)
+	hwnd = 0  # janela do objeto que confirmou o contexto
+	obj = None  # o objeto de foco que confirmou (referência forte, solta no próximo foco)
 
 
-def _compute_web_verdict(obj):
-	"""(veredito, conhecido) sem usar o cache por janela."""
-	try:
-		holder = obj.treeInterceptor
-	except Exception:
-		holder = None
-	if holder is not None:
-		verdict = ti_verdict(holder)
-		if verdict is not None:
-			return verdict, True
-	doc = find_document(obj)
-	if doc is not None:
-		verdict = url_is_whatsapp(document_url(doc))
-		if verdict is not None:
-			return verdict, True
-	return False, False
+def active():
+	"""Contexto do último evento de foco ("app", "web" ou None). Sem COM, sem api.
 
-
-def web_verdict(obj):
-	"""O objeto de navegador está no WhatsApp Web (endereço confirmado)?"""
-	try:
-		hwnd = obj.windowHandle
-	except Exception:
-		hwnd = 0
-	hit = _hwnd_cache.get(hwnd) if hwnd else None
-	if hit is not None:
-		ttl = _HWND_TTL_KNOWN if hit[2] else _HWND_TTL_UNKNOWN
-		if time.monotonic() - hit[0] < ttl:
-			return hit[1]
-	verdict, known = _compute_web_verdict(obj)
-	if hwnd:
-		_remember_hwnd(hwnd, verdict, known)
-	return verdict
-
-
-def forget_web():
-	_ti_cache.clear()
-	_hwnd_cache.clear()
+	É a PRIMEIRA linha de todo gancho global: fora do WhatsApp (ou do WhatsApp
+	Web confirmado pelo endereço) devolve None e o gancho sai.
+	"""
+	return _Focus.kind
 
 
 def app_name_of(obj):
@@ -211,28 +183,113 @@ def app_name_of(obj):
 		return ""
 
 
-def raw_context(obj):
-	"""Contexto sem olhar o escopo: "app", "web" ou None."""
+def _is_app(obj):
 	try:
 		module = obj.appModule
 	except Exception:
-		return None
+		return False
 	if module is None:
-		return None
+		return False
 	if getattr(module, "isWhatsAppUnified", False):
-		return "app"
-	name = app_name_of(obj)
-	if name == APP_NAME:
-		return "app"
-	if name in BROWSER_APPS:
-		try:
-			return "web" if web_verdict(obj) else None
-		except Exception:
+		return True
+	return (getattr(module, "appName", "") or "").lower() == APP_NAME
+
+
+def _confirm_web(obj):
+	"""O foco (``obj``) está num documento cujo ENDEREÇO é web.whatsapp.com?
+
+	Uma leitura de endereço por evento de foco: o buffer (tree interceptor) que o
+	NVDA já resolveu para o foco, ou, sem buffer, o documento da cadeia de
+	ancestrais do foco (que o NVDA já tem pronta). Barra de endereço, abas e
+	menus do navegador não têm documento: custo zero e resposta "não".
+	"""
+	try:
+		holder = obj.treeInterceptor
+	except Exception:
+		holder = None
+	if holder is not None:
+		verdict = ti_verdict(holder)
+		if verdict is not None:
+			return verdict
+	doc = find_document(obj)
+	if doc is not None:
+		return bool(url_is_whatsapp(document_url(doc)))
+	return False
+
+
+def update_focus(obj):
+	"""Chamado PELO plugin global em todo evento de foco: decide o contexto UMA vez.
+
+	Devolve "app", "web" ou None. Programa que não é o WhatsApp nem um navegador:
+	só o nome do aplicativo é lido (sem COM) e o contexto é zerado.
+	"""
+	kind = None
+	hwnd = 0
+	try:
+		if _is_app(obj):
+			kind = "app"
+		elif app_name_of(obj) in BROWSER_APPS and _confirm_web(obj):
+			kind = "web"
+		if kind is not None:
+			hwnd = obj.windowHandle
+	except Exception:
+		kind = None
+	_Focus.kind = kind
+	_Focus.hwnd = hwnd
+	_Focus.obj = obj if kind is not None else None
+	return kind
+
+
+def forget_focus():
+	_Focus.kind = None
+	_Focus.hwnd = 0
+	_Focus.obj = None
+
+
+def forget_web():
+	_ti_cache.clear()
+	forget_focus()
+
+
+def web_overlay_allowed(obj):
+	"""Criação de objeto de navegador: o foco confirmado é WhatsApp Web e o objeto é da mesma janela?
+
+	Comparação barata (nenhuma chamada ao navegador): o evento de foco já
+	confirmou o endereço; aqui só se compara a janela do objeto com a do foco.
+	"""
+	if _Focus.kind != "web":
+		return False
+	try:
+		if api.getFocusObject() is not _Focus.obj:
+			return False
+		return obj.windowHandle == _Focus.hwnd
+	except Exception:
+		return False
+
+
+def raw_context(obj=None):
+	"""Contexto sem olhar o escopo: "app", "web" ou None.
+
+	``obj`` None ou o próprio foco: devolve o contexto do foco. Outro objeto: só
+	vale se for do mesmo programa e da mesma janela que o foco confirmado.
+	"""
+	kind = _Focus.kind
+	if kind is None:
+		return None
+	try:
+		focus = api.getFocusObject()
+		if focus is not _Focus.obj:
 			return None
-	return None
+		if obj is None or obj is focus:
+			return kind
+		if kind == "app":
+			return "app" if _is_app(obj) else None
+		return "web" if (app_name_of(obj) in BROWSER_APPS and obj.windowHandle == _Focus.hwnd) else None
+	except Exception:
+		return None
 
 
-def wa_context(obj):
+def wa_context(obj=None):
 	""""app", "web" ou None, já respeitando a opção de escopo."""
 	kind = raw_context(obj)
 	if kind and not settings.scope_allows(kind):
@@ -248,13 +305,7 @@ def is_web_document(doc):
 	"""
 	if app_name_of(doc) not in BROWSER_APPS:
 		return False
-	verdict = url_is_whatsapp(document_url(doc))
-	if verdict is not None:
-		try:
-			_remember_hwnd(doc.windowHandle, verdict)
-		except Exception:
-			pass
-	return bool(verdict)
+	return bool(url_is_whatsapp(document_url(doc)))
 
 
 # ─── Que tipo de linha é este objeto? ────────────────────────────────────────
@@ -337,11 +388,3 @@ def row_kind(obj):
 
 def forget_kinds():
 	_kind_cache.clear()
-
-
-def in_whatsapp_foreground():
-	"""O foco atual está no WhatsApp (app ou web, conforme o escopo)?"""
-	try:
-		return wa_context(api.getFocusObject()) is not None
-	except Exception:
-		return False

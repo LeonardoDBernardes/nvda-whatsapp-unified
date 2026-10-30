@@ -32,8 +32,8 @@ import speech
 import winUser
 from controlTypes import OutputReason
 
-from . import settings
-from .context import raw_context, wa_context
+from . import diag, settings
+from .context import active, raw_context, wa_context
 from .tree import (
 	LIST_ROLES,
 	Role,
@@ -91,7 +91,12 @@ def now():
 # ─── teclas ──────────────────────────────────────────────────────────────────
 
 def on_raw_key(vkCode=0, scanCode=0, extended=False, pressed=True, **kwargs):
-	"""Handler de ``inputCore.decide_handleRawKey``: só anota a tecla e deixa passar."""
+	"""Handler de ``inputCore.decide_handleRawKey``: só anota a tecla e deixa passar.
+
+	Fora do WhatsApp nem anota: sai na primeira linha.
+	"""
+	if active() is None:
+		return True
 	if pressed:
 		_State.last_key = vkCode
 		_State.last_key_at = now()
@@ -264,11 +269,12 @@ def handle_gain_focus(obj, nextHandler):
 
 	Devolve True se tratou o evento (não chame ``nextHandler`` de novo).
 	"""
-	if wa_context(obj) is None:
+	if wa_context() is None:
 		return False
 	remember(obj)
 	if not should_defer(obj):
 		return False
+	diag.act("foco-adiado", "tipo=%s %s" % (_State.kind, diag.describe(obj)))
 	obj.reportFocus = _silent_report
 	try:
 		nextHandler()
@@ -288,13 +294,16 @@ def check_focus(obj):
 			return  # o foco já foi para outro lugar e falou sozinho
 		at = now()
 		if at - _State.last_recovery_at < MIN_INTERVAL_S or mouse_recent():
+			diag.act("foco-falado-original", "motivo=intervalo-ou-mouse")
 			speech.speakObject(obj, reason=OutputReason.FOCUS)
 			return
 		target = pick_target(obj)
 		if target is None:
+			diag.act("foco-falado-original", "motivo=sem-alvo")
 			speech.speakObject(obj, reason=OutputReason.FOCUS)
 			return
 		_State.last_recovery_at = at
+		diag.act("foco-recuperado", "tipo=%s %s" % (_State.kind, diag.describe(target)))
 		target.setFocus()
 	except Exception:
 		try:

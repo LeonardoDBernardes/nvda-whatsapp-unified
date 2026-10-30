@@ -89,7 +89,7 @@ def test_saving_the_panel_deletes_the_old_key_instead_of_rewriting_it():
 
 	section = conf_as_configobj(disableFocusLock="True", autoFocusMode="False")
 	panel = type("FakePanel", (), {})()
-	for name in ("filterMessageList", "filterChatList", "filterUsageHints", "filterTalvez", "autoFocusMode", "focusRecovery"):
+	for name in ("filterMessageList", "filterChatList", "filterUsageHints", "filterTalvez", "autoFocusMode", "focusRecovery", "diagLog"):
 		setattr(panel, name, Box(True))
 	panel.scope = Box(True)
 	settings.WhatsAppUnifiedSettings.onSave(panel)
@@ -257,12 +257,12 @@ def test_terminate_drops_references_and_verdicts():
 	plugin = GlobalPlugin()
 	page = Page()
 	overlays.note_page_focus(page.composer)
-	context.raw_context(page.composer)
+	focus(page.composer)
 	context.row_kind(page.msg_rows[0])
-	assert overlays._PageMemory.last is page.composer
+	assert overlays._PageMemory.last is page.composer and context.active() == "web"
 	plugin.terminate()
 	assert overlays._PageMemory.last is None and overlays._PageMemory.hwnd == 0
-	assert context._hwnd_cache == {} and context._kind_cache == {}
+	assert context.active() is None and context._Focus.obj is None and context._kind_cache == {}
 	assert recovery._State.row_ref is None
 
 
@@ -393,6 +393,6 @@ def test_click_between_the_event_and_the_check_cancels_the_recovery(plugin, cloc
 def test_manifest_versions():
 	with open(os.path.join(ROOT, "manifest.ini"), encoding="utf-8") as handle:
 		text = handle.read()
-	assert "version = 2.0.0" in text
+	assert "version = 2.0.1" in text
 	assert "minimumNVDAVersion = 2026.1" in text
 	assert "lastTestedNVDAVersion = 2026.2" in text

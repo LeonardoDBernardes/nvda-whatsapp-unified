@@ -26,6 +26,7 @@ SPEC = {
 	"filterTalvez": "boolean(default=True)",
 	"autoFocusMode": "boolean(default=True)",  # modo foco automático no WhatsApp Web
 	"focusRecovery": "boolean(default=True)",  # recuperar o foco perdido
+	"diagLog": "boolean(default=True)",  # registrar as ações do add-on no log do NVDA (diagnóstico)
 }
 
 DEFAULTS = {
@@ -36,6 +37,7 @@ DEFAULTS = {
 	"filterTalvez": True,
 	"autoFocusMode": True,
 	"focusRecovery": True,
+	"diagLog": True,
 }
 
 SCOPE_CHOICES = [
@@ -147,6 +149,11 @@ class WhatsAppUnifiedSettings(SettingsPanel):
 		)
 		self.focusRecovery.SetValue(bool(get("focusRecovery")))
 
+		self.diagLog = helper.addItem(
+			wx.CheckBox(self, label=_("Registrar ações no log do NVDA (diagnóstico)")),
+		)
+		self.diagLog.SetValue(bool(get("diagLog")))
+
 	def onSave(self):
 		section = config.conf[CONFIG_SECTION]
 		keys = [key for key, _label in SCOPE_CHOICES]
@@ -157,6 +164,7 @@ class WhatsAppUnifiedSettings(SettingsPanel):
 		section["filterTalvez"] = self.filterTalvez.IsChecked()
 		section["autoFocusMode"] = self.autoFocusMode.IsChecked()
 		section["focusRecovery"] = self.focusRecovery.IsChecked()
+		section["diagLog"] = self.diagLog.IsChecked()
 		# O interruptor antigo deixa de valer quando o usuário salva o painel novo:
 		# a chave é APAGADA (regravar False deixaria um texto 'False' no arquivo).
 		try:

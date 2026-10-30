@@ -51,6 +51,7 @@ def test_control_native_buffer_flips_mode_and_plays_sound():
 	"""CONTROLE: o buffer nativo do NVDA troca de modo e toca o som no mesmo percurso."""
 	page = Page()
 	ti = ChromeVBuf(page.doc)
+	page.attach(ti)
 	browseMode.reportPassThrough.last = False
 	run_sequence(ti, page)
 	assert ti.passThroughChanges, "o buffer nativo deveria trocar de modo neste percurso"
@@ -61,6 +62,7 @@ def test_control_native_buffer_flips_mode_and_plays_sound():
 def test_pinned_buffer_never_plays_sound_nor_changes_mode():
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
 	assert ti.passThrough is True
 	browseMode.reportPassThrough.last = False  # o Leo vinha de outra aba em modo de navegacao
 	enter(ti, page)
@@ -73,6 +75,7 @@ def test_pinned_buffer_never_plays_sound_nor_changes_mode():
 def test_report_pass_through_returns_silently_for_every_focus_in_the_sequence():
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
 	enter(ti, page)
 	run_sequence(ti, page)
 	assert browseMode.calls, "o NVDA chama reportPassThrough; o que importa e nao tocar"
@@ -83,6 +86,7 @@ def test_report_pass_through_returns_silently_for_every_focus_in_the_sequence():
 def test_should_pass_through_gives_the_same_answer_for_every_object():
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
 	from controlTypes import OutputReason
 
 	answers = {
@@ -95,6 +99,7 @@ def test_entering_the_document_is_silent_even_after_a_browse_mode_tab():
 	page = Page()
 	browseMode.reportPassThrough.last = False
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
 	focus(page.chat_rows[0])
 	ti.event_treeInterceptor_gainFocus()
 	assert browseMode.sounds == []
@@ -104,6 +109,7 @@ def test_returning_to_whatsapp_after_another_document_stays_silent():
 	"""Outra aba (modo de navegacao) muda o ``.last`` global; ao voltar nao toca."""
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
 	enter(ti, page)
 	browseMode.reportPassThrough.last = False  # outra aba reportou "modo de navegacao"
 	focus(page.msg_rows[0])
@@ -115,6 +121,7 @@ def test_returning_to_whatsapp_after_another_document_stays_silent():
 def test_escape_is_sent_to_the_page_and_keeps_focus_mode_silently():
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
 	enter(ti, page)
 	gesture = Gesture("escape")
 	ti.script_disablePassThrough(gesture)
@@ -126,6 +133,7 @@ def test_escape_is_sent_to_the_page_and_keeps_focus_mode_silently():
 def test_nvda_space_is_native_and_plays_the_sound_only_on_purpose():
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
 	enter(ti, page)
 	focus(page.msg_rows[0])
 	browseMode.toggle_pass_through(ti)  # NVDA+Espaco: sai do modo foco
@@ -148,6 +156,7 @@ def test_nvda_space_is_native_and_plays_the_sound_only_on_purpose():
 def test_browse_mode_choice_still_enters_text_fields_like_nvda():
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
 	enter(ti, page)
 	browseMode.toggle_pass_through(ti)  # o Leo escolheu navegacao
 	ti.event_gainFocus(page.composer, lambda: None)
@@ -165,6 +174,7 @@ def test_other_site_keeps_the_native_buffer():
 def test_other_site_buffer_is_not_pinned_and_behaves_natively():
 	page = Page(url="https://www.example.com/")
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
 	assert ti.passThrough is False
 	assert ti.disableAutoPassThrough is False
 	browseMode.reportPassThrough.last = False
@@ -196,6 +206,7 @@ def test_option_off_gives_native_behavior():
 	config.conf[settings.CONFIG_SECTION]["autoFocusMode"] = False
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
 	assert ti.passThrough is False
 	ti.event_gainFocus(page.composer, lambda: None)
 	ti.event_gainFocus(page.msg_rows[0], lambda: None)
@@ -206,6 +217,7 @@ def test_old_disable_focus_lock_switch_is_honored():
 	config.conf[settings.CONFIG_SECTION]["disableFocusLock"] = True
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
 	assert ti.passThrough is False
 
 
@@ -214,6 +226,7 @@ def test_old_disable_focus_lock_stored_as_text_false_does_not_disable_the_mode()
 	config.conf[settings.CONFIG_SECTION]["disableFocusLock"] = "False"
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
 	assert ti.passThrough is True and ti.disableAutoPassThrough is True
 
 
@@ -236,6 +249,7 @@ def test_faq_and_institutional_pages_keep_the_native_buffer():
 def test_navigating_the_same_buffer_to_another_site_releases_the_pinned_mode_silently():
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
 	enter(ti, page)
 	assert ti.passThrough is True and ti.disableAutoPassThrough is True
 	browseMode.sounds.clear()
@@ -251,6 +265,8 @@ def test_navigating_the_same_buffer_to_another_site_releases_the_pinned_mode_sil
 def test_navigating_back_to_whatsapp_pins_again():
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
+	focus(page.msg_rows[0])
 	page.doc.IAccessibleObject.url = "https://www.example.com/"
 	ti.event_gainFocus(page.msg_rows[0], lambda: None)
 	assert ti.disableAutoPassThrough is False
@@ -264,6 +280,7 @@ def test_navigating_back_to_whatsapp_pins_again():
 def test_turning_the_option_off_takes_effect_without_reloading_the_page():
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
 	enter(ti, page)
 	assert ti.passThrough is True
 	config.conf[settings.CONFIG_SECTION]["autoFocusMode"] = False
@@ -280,6 +297,7 @@ def test_unpinning_while_the_composer_is_focused_keeps_focus_mode():
 	"""Desligar a opcao com o foco no campo de digitacao nao pode jogar o Leo em modo navegacao."""
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
 	enter(ti, page)
 	focus(page.composer)
 	config.conf[settings.CONFIG_SECTION]["autoFocusMode"] = False
@@ -297,8 +315,10 @@ def test_other_buffer_after_whatsapp_keeps_native_sounds():
 	whats = Page()
 	other = Page(url="https://www.example.com/")
 	wa_ti = WhatsAppChromeVBuf(whats.doc)
+	whats.attach(wa_ti)
 	enter(wa_ti, whats)
 	other_ti = ChromeVBuf(other.doc)
+	other.attach(other_ti)
 	other_ti.event_gainFocus(other.msg_rows[0], lambda: None)
 	other_ti.event_gainFocus(other.composer, lambda: None)
 	assert "focusMode.wav" in browseMode.sounds
@@ -312,6 +332,7 @@ def test_chromium_document_stub_is_a_real_subclass():
 def test_pinned_answer_ignores_role(role):
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
 	from controlTypes import OutputReason
 
 	node = Node(role, "x", states={State.FOCUSABLE})

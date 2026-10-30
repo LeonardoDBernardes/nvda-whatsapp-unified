@@ -39,13 +39,17 @@ def clean_state():
 	keyboardHandler.sent.clear()
 	inputCore.decide_handleRawKey.handlers.clear()
 	filter_speechSequence.handlers.clear()
-	from globalPlugins.whatsAppUnified import context, recovery, settings
+	from globalPlugins.whatsAppUnified import context, diag, recovery, settings, webmode
+	import logHandler
 
 	settings.register_config()
 	config.conf[settings.CONFIG_SECTION].update(settings.DEFAULTS)
 	recovery.reset()
 	context.forget_kinds()
 	context.forget_web()
+	diag.reset()
+	webmode.forget_entry()
+	logHandler.log.lines.clear()
 	import mouseHandler
 
 	mouseHandler.lastMouseEventTime = 0

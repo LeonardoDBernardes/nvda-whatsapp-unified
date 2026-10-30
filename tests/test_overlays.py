@@ -1,7 +1,7 @@
 """Quais classes de sobreposicao cada objeto recebe."""
 
 from controlTypes import Role
-from fakes import FakeApp, Node, Page, apply_overlays
+from fakes import FakeApp, Node, Page, apply_overlays, focus
 
 from globalPlugins.whatsAppUnified import overlays
 from globalPlugins.whatsAppUnified.webmode import WhatsAppWebDocument
@@ -23,6 +23,7 @@ def test_chat_rows_and_message_rows_get_their_overlays():
 
 def test_chat_cell_gets_the_chat_overlay_and_no_scripts():
 	page = Page()
+	focus(page.composer)
 	cell = page.chat_rows[0].firstChild
 	apply_overlays(cell, {"web"})
 	assert isinstance(cell, overlays.ChatListRow)
@@ -31,6 +32,7 @@ def test_chat_cell_gets_the_chat_overlay_and_no_scripts():
 
 def test_other_objects_get_nothing():
 	page = Page()
+	focus(page.composer)
 	for obj in (page.call_button, page.composer, page.msg_list, page.chat_list):
 		assert apply_overlays(obj, {"web"}) == []
 
@@ -89,6 +91,7 @@ def test_selection_popup_overlay():
 	popup.IAccessibleRole = oleacc.ROLE_SYSTEM_MENUPOPUP
 	popup._app = page.app
 	page.main.add(popup)
+	focus(page.composer)
 	assert apply_overlays(popup, {"web"}) == [overlays.SelectionPopup]
 
 
@@ -100,8 +103,8 @@ def test_selection_popup_does_not_steal_focus_from_the_text_field():
 	popup = Node(Role.POPUPMENU, "")
 	popup.IAccessibleRole = oleacc.ROLE_SYSTEM_MENUPOPUP
 	page.main.add(popup)
-	apply_overlays(popup, {"web"})
 	focus(page.composer)
+	apply_overlays(popup, {"web"})
 	popup.windowHandle = page.composer.windowHandle
 	assert popup.shouldAllowIAccessibleMenuStartEvent is False
 	popup.states.add(overlays.State.FOCUSED)

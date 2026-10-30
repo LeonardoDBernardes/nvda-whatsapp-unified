@@ -1,4 +1,4 @@
-# WhatsApp Unified 2.0.0 — WhatsApp accessibility for NVDA
+# WhatsApp Unified 2.0.1 — WhatsApp accessibility for NVDA
 
 NVDA add-on for **WhatsApp Desktop** (the Microsoft Store app, which uses WebView2) and for **WhatsApp Web** (Chrome, Edge, Brave and other Chromium-based browsers).
 
@@ -60,6 +60,7 @@ NVDA → Preferences → Settings → **WhatsApp Unified**. They take effect imm
 | Remove "Maybe" before contact names | Yes | "Maybe John" becomes "John", only in the chat name or the message sender. Never inside a message's text. |
 | Keep focus mode automatically on WhatsApp Web, with no mode switch sound | Yes | Turns on the part described in the next section. |
 | Recover focus when WhatsApp loses it | Yes | Turns on focus recovery. |
+| Log add-on actions in the NVDA log (diagnostics) | Yes (in this test version) | Writes a line starting with `WhatsAppUnificado:` to the NVDA log (INFO level, open it with NVDA+F1) whenever the add-on acts: overlay applied, focus deferred or recovered, script run, speech filtered, focus mode pinned or released. At most one line per action every 2 seconds and 200 lines per session. It never records message text, only the object's role and the text length. |
 
 The old `disableFocusLock` option (1.x) was merged into "Keep focus mode automatically". If it was on in your `nvda.ini`, 2.0 honors that until you save the new panel.
 
@@ -104,6 +105,16 @@ WhatsApp mounts and unmounts rows as you scroll (the lists are virtualized). Whe
 4. If it finds nothing, it speaks the original focus. At most **one recovery per second**: it never loops.
 
 It also helps with this: after Alt+Tab, messages lose their names in WhatsApp; the add-on reads the text of the message parts when the name comes back empty.
+
+## What changed in 2.0.1 (isolation)
+
+Leo's report with 2.0.0: "it is influencing other windows". Cause and fix:
+
+1. **No per-window verdict.** 2.0.0 remembered for 2 seconds that "this window is WhatsApp Web". In Chrome the tabs and the browser UI share windows, so other tabs looked like WhatsApp right after you left it. Now the context is computed **once per focus event**, from the address of the focused document (`web.whatsapp.com`), and applies to that focus only.
+2. **Cheap, strict overlay choice.** For a browser object an overlay is chosen only if the current focus was already confirmed as WhatsApp Web and the object belongs to the same window. No browser call per object, on any site. The first object when entering WhatsApp (created before the focus event) gets its overlay in the focus event itself.
+3. **Every global hook exits on its first line** when the focus is not in WhatsApp: speech (`filter_speechSequence`), keys (`decide_handleRawKey`, `getScript`), objects (`chooseNVDAObjectOverlayClasses`) and focus (`event_gainFocus`). Outside WhatsApp the add-on reads nothing but the program name.
+4. **Focus mode and `reportPassThrough.last`.** The add-on writes it only with focus inside WhatsApp Web and, when leaving, gives back the value from before entering (once), so switching tabs sounds like plain NVDA. The buffer never pins the mode by assumption: with no confirmed address it is born released, and the document checks the address again when choosing the buffer.
+5. **Diagnostics in the log** (new option, above), to show exactly when the add-on acts.
 
 ## What changed in 2.0 and why
 
@@ -193,7 +204,7 @@ whatsapp-unified/
 ```
 python3 -m pytest tests                  # tests with a simulated NVDA
 python3 tests/check_nvda_api.py          # checks every API against the NVDA 2026.2 source
-./build.sh                               # builds whatsAppUnified-2.0.0.nvda-addon
+./build.sh                               # builds whatsAppUnified-2.0.1.nvda-addon
 ```
 
 The stubs in `tests/stubs/` faithfully reproduce the part of `browseMode.py` that decides the mode and plays the sound; the control test proves that, without the add-on, the sound plays over the same focus path.
@@ -210,4 +221,4 @@ This add-on is **GPL version 2** (`COPYING` file). It was born from the union of
 
 The NVDA 2026.2 code (NV Access, GPL-2) was the reference for every API used.
 
-Current version: **2.0.0**.
+Current version: **2.0.1**.

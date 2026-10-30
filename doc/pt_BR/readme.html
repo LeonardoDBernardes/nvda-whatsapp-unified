@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>WhatsApp Unificado 2.0.0</title>
+  <title>WhatsApp Unificado 2.0.1</title>
   <style>
     html {
       color: #1a1a1a;
@@ -166,11 +166,11 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">WhatsApp Unificado 2.0.0</h1>
+<h1 class="title">WhatsApp Unificado 2.0.1</h1>
 </header>
 <h1
-id="whatsapp-unificado-200--acessibilidade-do-whatsapp-para-o-nvda">WhatsApp
-Unificado 2.0.0 — acessibilidade do WhatsApp para o NVDA</h1>
+id="whatsapp-unificado-201--acessibilidade-do-whatsapp-para-o-nvda">WhatsApp
+Unificado 2.0.1 — acessibilidade do WhatsApp para o NVDA</h1>
 <p>Add-on do NVDA para o <strong>WhatsApp Desktop</strong> (o aplicativo
 da Microsoft Store, que usa WebView2) e para o <strong>WhatsApp
 Web</strong> (Chrome, Edge, Brave e outros navegadores baseados em
@@ -364,6 +364,16 @@ de modo</td>
 <td>Sim</td>
 <td>Liga a recuperação de foco.</td>
 </tr>
+<tr class="even">
+<td>Registrar ações no log do NVDA (diagnóstico)</td>
+<td>Sim (nesta versão de teste)</td>
+<td>Escreve no log do NVDA (nível INFO, abra com NVDA+F1) uma linha
+começando com <code>WhatsAppUnificado:</code> sempre que o add-on age:
+sobreposição aplicada, foco adiado ou recuperado, script executado, fala
+filtrada, modo foco fixado ou solto. No máximo uma linha por ação a cada
+2 segundos e 200 linhas por sessão. Nunca grava o texto de mensagens, só
+o papel do objeto e o tamanho do texto.</td>
+</tr>
 </tbody>
 </table>
 <p>A opção antiga <code>disableFocusLock</code> (1.x) foi incorporada em
@@ -456,6 +466,38 @@ recuperação por segundo</strong>: nunca entra em laço.</li>
 <p>Também ajuda no seguinte: depois do Alt+Tab as mensagens ficam sem
 nome no WhatsApp; o add-on lê o texto das partes da mensagem quando o
 nome vem vazio.</p>
+<h2 id="o-que-mudou-na-201-isolamento">O que mudou na 2.0.1
+(isolamento)</h2>
+<p>Relato do Leo com a 2.0.0: "ele está influenciando outras janelas".
+Causa e correção:</p>
+<ol type="1">
+<li><strong>Sem veredito por janela.</strong> A 2.0.0 guardava por 2
+segundos "esta janela é o WhatsApp Web". No Chrome as abas e a interface
+do navegador dividem janelas, então outras abas pareciam WhatsApp logo
+depois de você sair dele. Agora o contexto é calculado <strong>uma vez
+por evento de foco</strong>, pelo endereço do documento em foco
+(<code>web.whatsapp.com</code>), e vale só para aquele foco.</li>
+<li><strong>Escolha de sobreposição barata e estrita.</strong> Em objeto
+de navegador só se escolhe sobreposição se o foco atual já foi
+confirmado no WhatsApp Web e o objeto é da mesma janela. Nenhuma chamada
+ao navegador por objeto, em nenhum site. O primeiro objeto ao entrar no
+WhatsApp (criado antes do evento de foco) recebe a sobreposição no
+próprio evento de foco.</li>
+<li><strong>Todo gancho global sai na primeira linha</strong> quando o
+foco não está no WhatsApp: fala (<code>filter_speechSequence</code>),
+teclas (<code>decide_handleRawKey</code>, <code>getScript</code>),
+objetos (<code>chooseNVDAObjectOverlayClasses</code>) e foco
+(<code>event_gainFocus</code>). Fora do WhatsApp o add-on não lê nada
+além do nome do programa.</li>
+<li><strong>Modo foco e <code>reportPassThrough.last</code>.</strong> O
+add-on só escreve nele com o foco dentro do WhatsApp Web e, ao sair,
+devolve o valor de antes de entrar (uma vez), para trocar de aba soar
+como no NVDA puro. O buffer nunca fixa o modo por suposição: sem
+endereço confirmado ele nasce solto, e o documento confere o endereço de
+novo ao escolher o buffer.</li>
+<li><strong>Diagnóstico no log</strong> (opção nova, acima), para
+mostrar exatamente quando o add-on age.</li>
+</ol>
 <h2 id="o-que-mudou-na-20-e-por-quê">O que mudou na 2.0 e por quê</h2>
 <p>A 2.0 é uma reescrita do núcleo, feita depois de uma análise do
 código da 1.4.1 contra o código-fonte do NVDA 2026.2, de outros add-ons
@@ -637,7 +679,7 @@ são toleradas.</p>
 └── build.sh           gera o .nvda-addon</code></pre>
 <pre><code>python3 -m pytest tests                  # testes com o NVDA simulado
 python3 tests/check_nvda_api.py          # confere cada API contra o código-fonte do NVDA 2026.2
-./build.sh                               # gera whatsAppUnified-2.0.0.nvda-addon</code></pre>
+./build.sh                               # gera whatsAppUnified-2.0.1.nvda-addon</code></pre>
 <p>Os stubs de <code>tests/stubs/</code> reproduzem fielmente o trecho
 de <code>browseMode.py</code> que decide o modo e toca o som; o teste de
 controle prova que, sem o add-on, o som toca no mesmo percurso de
@@ -669,6 +711,6 @@ de áudio, documentação em português, a reescrita 2.0.</li>
 </ol>
 <p>O código do NVDA 2026.2 (NV Access, GPL-2) foi a referência de cada
 API usada.</p>
-<p>Versão atual: <strong>2.0.0</strong>.</p>
+<p>Versão atual: <strong>2.0.1</strong>.</p>
 </body>
 </html>
