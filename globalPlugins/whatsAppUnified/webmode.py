@@ -32,9 +32,11 @@ O QUE CONTINUA NATIVO:
 - Esc (relato do Leo, 30/10/2026: "barra de espaço e depois Esc" abria o menu da
   mensagem na 1.4; na 2.0.x o Esc ia para a página e fechava o menu): o Esc
   sai do modo foco para o modo de navegação, com o som, como no NVDA sem
-  add-on. Num item de menu o NVDA manda o Esc à página (fecha o menu), também
-  como sempre. Depois de um Esc, a trava volta sozinha quando o foco chega ao
-  campo de digitação ou a uma conversa ou mensagem (como a 1.4 fazia);
+  add-on. Dentro de um menu do WhatsApp (menu da mensagem, barra de reações)
+  o plugin global pega o Esc ANTES do buffer e o manda ao WhatsApp, sem som
+  (2.0.3, ver menu.py). Depois de um Esc, a trava volta sozinha quando o foco
+  chega ao campo de digitação, a uma conversa ou mensagem (como a 1.4 fazia)
+  ou a um menu do WhatsApp;
 - NVDA+Espaço alterna normalmente e toca o som, porque o ``.last`` está
   sincronizado com o modo anterior. Em modo de navegação escolhido assim a
   trava só volta em campo de texto ou com NVDA+Espaço de novo;
@@ -57,7 +59,7 @@ from controlTypes import OutputReason
 from NVDAObjects.IAccessible import chromium
 from NVDAObjects.IAccessible.chromium import ChromeVBuf
 
-from . import diag, settings
+from . import diag, menu, settings
 from .context import is_web_document, ti_verdict
 
 
@@ -197,8 +199,15 @@ class WhatsAppChromeVBuf(ChromeVBuf):
 			self._disableAutoPassThrough = False
 
 	def _wa_relock(self, obj):
-		"""Em modo de navegação, este foco deve voltar ao modo foco travado?"""
+		"""Em modo de navegação, este foco deve voltar ao modo foco travado?
+
+		Menu do WhatsApp também volta (2.0.3): em modo de navegação as setas
+		sairiam do menu para as mensagens. O plugin global trata o foco antes do
+		buffer, então ``menu.active()`` já é o menu deste foco.
+		"""
 		if editable_and_available(obj):
+			return True
+		if menu.active() is not None:
 			return True
 		return self._wa_escaped and getattr(obj, "wa_kind", None) in ("chat", "message")
 

@@ -196,22 +196,25 @@ def test_commands_in_the_browser_without_a_document_just_say_not_found(monkeypat
 def test_row_classification_is_cached_per_container(monkeypatch):
 	page = Page()
 	calls = []
-	original = context.find_composer
-	monkeypatch.setattr(context, "find_composer", lambda *a, **k: calls.append(1) or original(*a, **k))
+	original = context.safe_parent
+	monkeypatch.setattr(context, "safe_parent", lambda o: calls.append(1) or original(o))
+	context.row_kind(page.msg_rows[0])
+	first = len(calls)
 	for row in page.msg_rows * 3:
 		assert context.row_kind(row) == "message"
-	assert len(calls) == 1  # a busca do campo de digitacao roda uma vez para a lista toda
+	assert len(calls) - first == len(page.msg_rows) * 3  # so o pai de cada linha; o contêiner vem do cache
 
 
-def test_message_classification_search_is_bounded():
+def test_message_classification_never_searches_the_page(monkeypatch):
+	"""2.0.3: so sobe pelos pais (a 2.0.2 procurava o campo de digitacao: 400-600 ms por mensagem)."""
 	page = Page()
-	page.main.remove(page.composer)
 	for index in range(200):
 		page.main.add(SlowNode(Role.SECTION, "n%d" % index))
 	context.forget_kinds()
+	monkeypatch.setattr(tree, "iter_children", lambda *a, **k: pytest.fail("varreu filhos"))
 	start = time.monotonic()
-	assert context.row_kind(page.msg_rows[0]) is None
-	assert time.monotonic() - start < 0.5
+	assert context.row_kind(page.msg_rows[0]) == "message"
+	assert time.monotonic() - start < 0.1
 
 
 def test_unconfirmed_web_page_creates_no_overlay_and_makes_no_walk(monkeypatch):
@@ -393,6 +396,6 @@ def test_click_between_the_event_and_the_check_cancels_the_recovery(plugin, cloc
 def test_manifest_versions():
 	with open(os.path.join(ROOT, "manifest.ini"), encoding="utf-8") as handle:
 		text = handle.read()
-	assert "version = 2.0.1" in text
+	assert "version = 2.0.3" in text
 	assert "minimumNVDAVersion = 2026.1" in text
 	assert "lastTestedNVDAVersion = 2026.2" in text

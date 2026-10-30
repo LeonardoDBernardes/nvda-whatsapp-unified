@@ -2,7 +2,7 @@
 
 import pytest
 from fakes import FakeApp, Node, Page, focus
-from controlTypes import Role
+from controlTypes import Role, State
 
 from globalPlugins.whatsAppUnified import context
 
@@ -234,8 +234,17 @@ def test_row_kind_chat_message_other():
 	assert context.row_kind(page.composer) is None
 
 
-def test_row_without_composer_nearby_is_not_a_message():
+def test_row_without_focusable_pane_or_chat_list_is_not_classified():
+	"""2.0.3: sem a lista de conversas e sem o painel focavel das mensagens, nao e linha do WhatsApp."""
+	page = Page()
+	page.msg_list.states.discard(State.FOCUSABLE)
+	context.forget_kinds()
+	assert context.row_kind(page.msg_rows[0]) is None
+
+
+def test_message_row_is_known_by_its_focusable_pane_without_the_composer():
+	"""2.0.3: o painel das mensagens (div focavel) basta; o campo de digitacao nao e procurado."""
 	page = Page()
 	page.main.remove(page.composer)
 	context.forget_kinds()
-	assert context.row_kind(page.msg_rows[0]) is None
+	assert context.row_kind(page.msg_rows[0]) == "message"

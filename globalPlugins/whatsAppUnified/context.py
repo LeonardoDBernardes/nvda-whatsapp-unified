@@ -21,19 +21,19 @@ import weakref
 
 import api
 
-from . import settings
+from . import diag, settings
 from .tree import (
 	ROW_ROLES,
 	CELL_ROLES,
 	Role,
+	State,
 	ancestors,
-	find_composer,
 	is_chat_list_container,
 	is_inner_focus,
-	new_deadline,
 	row_ancestor,
 	safe_parent,
 	safe_role,
+	safe_states,
 )
 
 # O NVDA grava o nome do executável em minúsculas e sem ".exe": o
@@ -315,7 +315,8 @@ def is_web_document(doc):
 _kind_cache = {}
 _KIND_TTL = 10.0
 _KIND_MAX = 128
-_CONVERSATION_SECONDS = 0.15
+# Até quantos níveis acima da linha procurar a lista de conversas ou o painel das mensagens.
+_KIND_LEVELS = 7
 
 
 def _obj_key(obj):
@@ -328,23 +329,27 @@ def _obj_key(obj):
 			return id(obj)
 
 
-def _in_conversation(container):
-	"""A lista ``container`` está dentro do painel da conversa (tem o campo de digitação por perto)?
+def _is_message_pane(node):
+	"""Painel das mensagens: contêiner FOCÁVEL acima da linha, que não é a lista de conversas.
 
-	Sobe poucos níveis e procura o campo com orçamento pequeno, todos os níveis
-	dividindo um prazo curto.
+	Código da página, 29/10/2026 (WAWebConversationMsgs): as mensagens ficam
+	dentro de um div focável (``conversation-panel-messages``, tabIndex 0); a
+	lista de conversas é uma grade com nome ("Lista de conversas"), testada
+	antes em cada nível. A 2.0.2 procurava o campo de digitação em volta da
+	lista: 400 a 600 ms por mensagem no log do Leo (30/10) e nem sempre achava.
 	"""
-	deadline = new_deadline(_CONVERSATION_SECONDS)
-	for parent in ancestors(container, 5):
-		if time.monotonic() > deadline:
-			return False
-		if find_composer(parent, budget=300, deadline=deadline) is not None:
-			return True
-	return False
+	role = safe_role(node)
+	if role in ROW_ROLES or role == Role.DOCUMENT:
+		return False
+	return State.FOCUSABLE in safe_states(node)
 
 
 def classify_container(container):
-	"""'chat' | 'message' | None para o contêiner de linhas (guardado por contêiner)."""
+	"""'chat' | 'message' | None para o contêiner de linhas (guardado por contêiner).
+
+	Só sobe pelos pais (poucas chamadas): lista de conversas pelo nome, senão
+	o painel focável das mensagens. Para no documento.
+	"""
 	key = _obj_key(container)
 	now = time.monotonic()
 	hit = _kind_cache.get(key)
@@ -352,18 +357,20 @@ def classify_container(container):
 		return hit[1]
 	result = None
 	node = container
-	for _level in range(7):
-		if node is None:
+	for _level in range(_KIND_LEVELS):
+		if node is None or safe_role(node) == Role.DOCUMENT:
 			break
 		if is_chat_list_container(node):
 			result = "chat"
 			break
+		if _is_message_pane(node):
+			result = "message"
+			break
 		node = safe_parent(node)
-	if result is None and _in_conversation(container):
-		result = "message"
 	if len(_kind_cache) >= _KIND_MAX:
 		_kind_cache.clear()
 	_kind_cache[key] = (now, result)
+	diag.act("linha", "tipo=%s niveis=%d" % (result, _level + 1), key="linha:%s" % result)
 	return result
 
 

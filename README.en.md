@@ -1,4 +1,4 @@
-# WhatsApp Unified 2.0.2 — WhatsApp accessibility for NVDA
+# WhatsApp Unified 2.0.3 — WhatsApp accessibility for NVDA
 
 NVDA add-on for **WhatsApp Desktop** (the Microsoft Store app, which uses WebView2) and for **WhatsApp Web** (Chrome, Edge, Brave and other Chromium-based browsers).
 
@@ -43,7 +43,7 @@ NVDA add-on for **WhatsApp Desktop** (the Microsoft Store app, which uses WebVie
 | Alt+C | The same, but opens the text in a plain text window. |
 | Ctrl+C | Copies the message text and says "Copied". With no text, **or if you selected a piece of text**, the key goes to WhatsApp. |
 
-Inside a WhatsApp menu, in focus mode, up and down arrow walk the options (see "What changed in 2.0.2"). No other key is taken. In particular, **NVDA+Space** and **Esc** remain NVDA's and WhatsApp's own (see the focus mode section).
+Inside a WhatsApp menu (message menu, reaction bar), in focus mode, up and down arrow walk the options and **Esc goes straight to WhatsApp** (closes the menu, no mode switch sound); see "What changed in 2.0.3". Outside menus, **NVDA+Space** and **Esc** remain NVDA's own (see the focus mode section).
 
 NVDA+Shift+H was checked against the NVDA 2026.2 commands and is free. NVDA+Shift+I is no longer used: in NVDA 2026.2 it is the magnifier color filter.
 
@@ -60,7 +60,7 @@ NVDA → Preferences → Settings → **WhatsApp Unified**. They take effect imm
 | Remove "Maybe" before contact names | Yes | "Maybe John" becomes "John", only in the chat name or the message sender. Never inside a message's text. |
 | Keep focus mode automatically on WhatsApp Web, with no mode switch sound | Yes | Turns on the part described in the next section. |
 | Recover focus when WhatsApp loses it | Yes | Turns on focus recovery. |
-| Message menu starts on the options (Reply, Copy), not on the reactions | Yes | When the message menu opens, focus goes straight to the first option. Up arrow on the first option goes to the reactions. |
+| Message menu starts on the options (Reply, Copy), not on the reactions | Yes | When the message menu opens, focus goes straight to the first option (the add-on uses WhatsApp's own Tab). Up arrow on the first option goes to the reactions; down arrow on the reactions returns to the options. |
 | Log add-on actions in the NVDA log (diagnostics) | Yes (in this test version) | Writes a line starting with `WhatsAppUnificado:` to the NVDA log (INFO level, open it with NVDA+F1) whenever the add-on acts: overlay applied, focus deferred or recovered, script run, speech filtered, focus mode pinned or released. At most one line per action every 2 seconds and 200 lines per session. It never records message text, only the object's role and the text length. |
 
 The old `disableFocusLock` option (1.x) was merged into "Keep focus mode automatically". If it was on in your `nvda.ini`, 2.0 honors that until you save the new panel.
@@ -88,7 +88,7 @@ A buffer class of its own (`WhatsAppChromeVBuf`, derived from the Chromium one) 
 ### What stays native
 
 - **NVDA+Space** remains NVDA's and **plays the sound**, because it is your deliberate choice. If you leave focus mode, the add-on respects it: rows and buttons do not pull focus mode back; only the composer does, as NVDA already does. Pressing NVDA+Space again returns to the pinned focus mode.
-- **Esc** is NVDA's, as in 1.4: in focus mode it switches to browse mode (with the sound); a second Esc goes to WhatsApp. On a menu item Esc closes the menu. After an Esc, the pinned focus mode comes back by itself when focus reaches the message field, a chat or a message. (In 2.0.0 and 2.0.1 Esc went straight to WhatsApp, which broke the "Space then Esc" on the message menu.)
+- **Esc** outside menus is NVDA's, as in 1.4: in focus mode it switches to browse mode (with the sound); a second Esc goes to WhatsApp. **Inside a WhatsApp menu** (message menu, reaction bar) Esc goes straight to WhatsApp and closes the menu, with no sound and no browse mode (2.0.3), on the Web and in the app. After an Esc, the pinned focus mode comes back by itself when focus reaches the message field, a chat, a message or a WhatsApp menu. (In 2.0.0 and 2.0.1 Esc went straight to WhatsApp, which broke the "Space then Esc" on the message menu.)
 - **Other sites** are never affected: the add-on's buffer is only used when the address is WhatsApp's.
 
 ### Limits
@@ -106,6 +106,24 @@ WhatsApp mounts and unmounts rows as you scroll (the lists are virtualized). Whe
 4. If it finds nothing, it speaks the original focus. At most **one recovery per second**: it never loops.
 
 It also helps with this: after Alt+Tab, messages lose their names in WhatsApp; the add-on reads the text of the message parts when the name comes back empty.
+
+## What changed in 2.0.3 (message menu no longer escapes, Esc without sound)
+
+Leo's reports on 2.0.2 (30/10/2026): "walking the message menu with the arrows, it escapes to the message below or above", "on the Web, Space and Esc throw me to the reactions and one more Esc opens the menu" and "Esc in the menu makes the NVDA+Space sound". Both the app and the Web.
+
+**The cause**, found in WhatsApp's 29/10 code and in NVDA 2026.2:
+
+- From the keyboard, the message menu is **two** separate popups: the **reaction bar** (Like, Love, ... and "More reactions") and the **options menu** (Message info, Reply, Copy, ...). WhatsApp puts focus on the bar. WhatsApp's own path from the bar to the options is **Tab** (Shift+Tab back).
+- **Esc** on a reaction never reached WhatsApp: NVDA used it to leave focus mode (the sound, the same as NVDA+Space). In browse mode the arrows walk the page, not the menu, and move into the messages above and below. That is what made the menu "escape".
+
+**What 2.0.3 does:**
+
+1. **Space opens straight on the options.** When focus lands on the reaction bar, the add-on sends WhatsApp's Tab and focus reaches the first option, without speaking the reaction. No Esc is needed after Space any more.
+2. **Esc inside a WhatsApp menu goes to WhatsApp**: it closes the menu and returns to the message, **with no sound and no browse mode**, on the Web and in the app. (NVDA already does this for menu items on web pages; the add-on extends the rule to the reaction bar and the message menu.)
+3. **"Space then Esc" habit**: an Esc right after the menu opens (within 1.5 seconds and before any arrow) does not close the menu; it repeats the focused option. The next Esc closes it.
+4. **Arrows stay in the menu**: down and up walk only the options, wrapping at the end. Up on the first option goes back to the reaction bar (Left and Right walk the reactions); down on the bar returns to the options. If focus ever lands on a menu in browse mode, the Web returns to focus mode by itself.
+5. **Messages recognised without delay**: 2.0.2 searched for the message field to tell whether a row was a message, which cost 400 to 600 ms per message in Leo's log (and sometimes failed, leaving the message commands inactive). Now a few parent steps suffice: the chat list has a name, the message pane is the block that takes focus.
+6. **Menu diagnostics**: with logging on, lines `menu-entrou` (with the role chain, never text), `menu-barra-para-opcoes`, `menu-seta`, `menu-esc`, `menu-esc-costume`, `menu-saiu` and `linha tipo=...` appear. If the menu still escapes, the log shows where and why.
 
 ## What changed in 2.0.2 (messages, message menu and Esc)
 
@@ -216,7 +234,7 @@ whatsapp-unified/
 ```
 python3 -m pytest tests                  # tests with a simulated NVDA
 python3 tests/check_nvda_api.py          # checks every API against the NVDA 2026.2 source
-./build.sh                               # builds whatsAppUnified-2.0.2.nvda-addon
+./build.sh                               # builds whatsAppUnified-2.0.3.nvda-addon
 ```
 
 The stubs in `tests/stubs/` faithfully reproduce the part of `browseMode.py` that decides the mode and plays the sound; the control test proves that, without the add-on, the sound plays over the same focus path.
@@ -233,4 +251,4 @@ This add-on is **GPL version 2** (`COPYING` file). It was born from the union of
 
 The NVDA 2026.2 code (NV Access, GPL-2) was the reference for every API used.
 
-Current version: **2.0.2**.
+Current version: **2.0.3**.
