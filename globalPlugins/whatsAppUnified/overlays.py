@@ -10,6 +10,8 @@ Só objetos IAccessible entram aqui: misturar classes IAccessible e UIA gerou
 objetos quebrados na 1.2.x.
 """
 
+import time
+
 import api
 import controlTypes
 import inputCore
@@ -34,7 +36,7 @@ from .context import (
 	wa_context,
 	APP_NAME,
 )
-from .tree import CELL_ROLES, ROW_ROLES, State, is_defunct, safe_role
+from .tree import CELL_ROLES, INNER_FOCUS_ROLES, ROW_ROLES, State, is_defunct, row_ancestor, safe_role
 from .webmode import WhatsAppWebDocument
 
 addonHandler.initTranslation()
@@ -76,8 +78,16 @@ _MESSAGE_KEYS = {
 }
 
 
+# Papéis que podem receber as classes de linha: a linha, a célula e o div focável.
+_ROW_LIKE_ROLES = ROW_ROLES | CELL_ROLES | INNER_FOCUS_ROLES
+
+
 class MessageRow(NVDAObject):
-	"""Linha da lista de mensagens da conversa aberta."""
+	"""Mensagem da conversa aberta: a linha (TABLEROW) ou o div focável dentro dela.
+
+	O foco de verdade fica no div; os botões (reagir, menu, player) são irmãos
+	dele dentro da linha. Por isso toda busca parte de ``wa_row``.
+	"""
 
 	wa_kind = "message"
 	scriptCategory = CATEGORY
@@ -87,6 +97,12 @@ class MessageRow(NVDAObject):
 		self.wa_kind = "message"
 		# Calculado uma vez, na criação: o que o getScript usa a cada tecla é só isto.
 		self._wa_ctx = "web" if app_name_of(self) in BROWSER_APPS else "app"
+
+	def _get_wa_row(self):
+		"""A linha da mensagem (o próprio objeto, se for a linha). Lido só quando um comando roda."""
+		if safe_role(self) in ROW_ROLES:
+			return self
+		return row_ancestor(self) or self
 
 	def getScript(self, gesture):
 		"""Decisão BARATA: sem caminhar pela árvore (roda no gancho de teclado).
@@ -110,7 +126,7 @@ class MessageRow(NVDAObject):
 	@script(description=_("Tocar ou pausar mensagem de voz ou vídeo"))
 	@diag.scripted
 	def script_playMessage(self, gesture):
-		target = messagetext.play_target(self)
+		target = messagetext.play_target(self.wa_row)
 		if target is None:
 			gesture.send()
 			return
@@ -119,7 +135,7 @@ class MessageRow(NVDAObject):
 	@script(description=_("Pausar ou retomar o áudio da mensagem"))
 	@diag.scripted
 	def script_audioToggle(self, gesture):
-		buttons, slider = messagetext.find_player(self)
+		buttons, slider = messagetext.find_player(self.wa_row)
 		if slider is None:
 			gesture.send()
 			return
@@ -128,7 +144,7 @@ class MessageRow(NVDAObject):
 	@script(description=_("Aumentar ou diminuir a velocidade do áudio"))
 	@diag.scripted
 	def script_audioSpeed(self, gesture):
-		target = messagetext.speed_target(self)
+		target = messagetext.speed_target(self.wa_row)
 		if target is None:
 			gesture.send()
 			return
@@ -137,7 +153,7 @@ class MessageRow(NVDAObject):
 	@script(description=_("Menu de contexto da mensagem"))
 	@diag.scripted
 	def script_contextMenu(self, gesture):
-		button = messagetext.menu_button(self)
+		button = messagetext.menu_button(self.wa_row)
 		if button is not None:
 			button.doAction()
 			return
@@ -148,7 +164,7 @@ class MessageRow(NVDAObject):
 	@script(description=_("Reagir à mensagem"))
 	@diag.scripted
 	def script_reactMessage(self, gesture):
-		button = messagetext.react_button(self)
+		button = messagetext.react_button(self.wa_row)
 		if button is None:
 			ui.message(_("Botão de reação não encontrado"))
 			return
@@ -160,7 +176,7 @@ class MessageRow(NVDAObject):
 		def speak(text):
 			ui.message(text if text else _("Texto não encontrado"))
 
-		messagetext.expand_then(self, speak)
+		messagetext.expand_then(self.wa_row, speak, focus=self)
 
 	@script(description=_("Abrir mensagem em modo de navegação"))
 	@diag.scripted
@@ -171,7 +187,7 @@ class MessageRow(NVDAObject):
 			else:
 				ui.message(_("Texto não encontrado"))
 
-		messagetext.expand_then(self, show)
+		messagetext.expand_then(self.wa_row, show, focus=self)
 
 	@script(description=_("Abrir mensagem em janela de texto"))
 	@diag.scripted
@@ -184,7 +200,7 @@ class MessageRow(NVDAObject):
 
 			TextWindow(text, _("Mensagem"))
 
-		messagetext.expand_then(self, show)
+		messagetext.expand_then(self.wa_row, show, focus=self)
 
 	@script(description=_("Copiar mensagem"))
 	@diag.scripted
@@ -193,7 +209,7 @@ class MessageRow(NVDAObject):
 			# Há texto selecionado: o Ctrl+C é da página (copia só a seleção).
 			gesture.send()
 			return
-		text = messagetext.message_text(self)
+		text = messagetext.message_text(self.wa_row, focus=self)
 		if not text:
 			gesture.send()
 			return
@@ -306,6 +322,7 @@ class HostPane(NVDAObject):
 	_cache_focusRedirect = True
 
 	def _get_focusRedirect(self):
+		started = time.monotonic()
 		try:
 			target = real_page_focus()
 			if target is None or target is self:
@@ -313,6 +330,8 @@ class HostPane(NVDAObject):
 			return target
 		except Exception:
 			return None
+		finally:
+			diag.slow("painel-hospedeiro", started)
 
 
 # ─── escolha das classes ─────────────────────────────────────────────────────
@@ -323,58 +342,65 @@ def choose_overlay_classes(obj, clsList, contexts):
 	Chamado para TODO objeto criado, então os testes baratos vêm primeiro:
 	nome do aplicativo (local), depois escopo, depois papel.
 	"""
+	started = time.monotonic()
 	try:
-		name = app_name_of(obj)
-		if name == APP_NAME:
-			ctx = "app"
-		elif name in BROWSER_APPS:
-			ctx = "web"
-		else:
-			return
-		if ctx not in contexts or not settings.scope_allows(ctx):
-			return
-
-		if ctx == "app" and getattr(obj, "windowClassName", "") == HOST_PANE_CLASS:
-			clsList.insert(0, HostPane)
-			diag.act("overlay", "classe=HostPane " + diag.describe(obj))
-			return
-
-		if not isinstance(obj, IAccessible):
-			return
-
-		if ctx == "web" and any(issubclass(c, chromium.Document) for c in clsList):
-			if is_web_document(obj):
-				clsList.insert(0, WhatsAppWebDocument)
-				diag.act("overlay", "classe=WhatsAppWebDocument " + diag.describe(obj))
-			return
-
-		# Objeto de navegador: só se o foco ATUAL já foi confirmado como
-		# web.whatsapp.com (pelo endereço, no evento de foco) e o objeto é da mesma
-		# janela. Comparação barata: nenhuma chamada ao navegador, em nenhum site.
-		if ctx == "web" and not web_overlay_allowed(obj):
-			return
-
-		try:
-			is_popup = obj.IAccessibleRole == oleacc.ROLE_SYSTEM_MENUPOPUP
-		except Exception:
-			is_popup = False
-		if is_popup:
-			clsList.insert(0, SelectionPopup)
-			diag.act("overlay", "classe=SelectionPopup " + diag.describe(obj))
-			return
-
-		role = safe_role(obj)
-		if role in ROW_ROLES or role in CELL_ROLES:
-			kind = row_kind(obj)
-			if kind == "chat":
-				clsList.insert(0, ChatListRow)
-			elif kind == "message":
-				clsList.insert(0, MessageRow)
-			if kind in ("chat", "message"):
-				diag.act("overlay", "classe=%s %s" % (clsList[0].__name__, diag.describe(obj)))
+		_choose(obj, clsList, contexts)
 	except Exception:
 		# Escolher classe nunca pode quebrar a criação do objeto.
 		return
+	finally:
+		diag.slow("overlay", started)
+
+
+def _note(cls, obj, extra=""):
+	diag.act("overlay", "classe=%s%s %s" % (cls.__name__, extra, diag.describe(obj)), key="overlay:" + cls.__name__)
+
+
+def _choose(obj, clsList, contexts):
+	name = app_name_of(obj)
+	if name == APP_NAME:
+		ctx = "app"
+	elif name in BROWSER_APPS:
+		ctx = "web"
+	else:
+		return
+	if ctx not in contexts or not settings.scope_allows(ctx):
+		return
+
+	if ctx == "app" and getattr(obj, "windowClassName", "") == HOST_PANE_CLASS:
+		clsList.insert(0, HostPane)
+		_note(HostPane, obj)
+		return
+
+	if not isinstance(obj, IAccessible):
+		return
+
+	if ctx == "web" and any(issubclass(c, chromium.Document) for c in clsList):
+		if is_web_document(obj):
+			clsList.insert(0, WhatsAppWebDocument)
+			_note(WhatsAppWebDocument, obj)
+		return
+
+	# Objeto de navegador: só se o foco ATUAL já foi confirmado como
+	# web.whatsapp.com (pelo endereço, no evento de foco) e o objeto é da mesma
+	# janela. Comparação barata: nenhuma chamada ao navegador, em nenhum site.
+	if ctx == "web" and not web_overlay_allowed(obj):
+		return
+
+	try:
+		is_popup = obj.IAccessibleRole == oleacc.ROLE_SYSTEM_MENUPOPUP
+	except Exception:
+		is_popup = False
+	if is_popup:
+		clsList.insert(0, SelectionPopup)
+		_note(SelectionPopup, obj)
+		return
+
+	if safe_role(obj) in _ROW_LIKE_ROLES:
+		overlay = {"chat": ChatListRow, "message": MessageRow}.get(row_kind(obj))
+		if overlay is not None:
+			clsList.insert(0, overlay)
+			_note(overlay, obj)
 
 
 _upgraded = {}
@@ -392,8 +418,7 @@ def upgrade_focus_object(obj):
 	try:
 		if getattr(obj, "wa_kind", None) or not isinstance(obj, IAccessible):
 			return
-		role = safe_role(obj)
-		if role not in ROW_ROLES and role not in CELL_ROLES:
+		if safe_role(obj) not in _ROW_LIKE_ROLES:
 			return
 		kind = row_kind(obj)
 		overlay = {"chat": ChatListRow, "message": MessageRow}.get(kind)
@@ -410,6 +435,6 @@ def upgrade_focus_object(obj):
 		init = overlay.__dict__.get("initOverlayClass")
 		if init is not None:
 			init(obj)
-		diag.act("overlay", "classe=%s (na entrada) %s" % (overlay.__name__, diag.describe(obj)))
+		_note(overlay, obj, " (na entrada)")
 	except Exception:
 		return

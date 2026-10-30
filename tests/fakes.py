@@ -210,6 +210,25 @@ def message_row(name, extra=()):
 	return Node(Role.TABLEROW, name, states={State.FOCUSABLE}, children=children)
 
 
+def inner_row(name, selected=False, buttons=("Menu",)):
+	"""Estrutura real (29/10/2026): linha (TABLEROW) que NAO aceita foco > div focavel (SECTION)
+	com o texto + fileira de botoes de acao. O foco do NVDA fica no div, nao na linha."""
+	states = {State.FOCUSABLE}
+	if selected:
+		states.add(State.SELECTED)
+	inner = Node(Role.SECTION, name, states=states, children=[Node(Role.STATICTEXT, name)])
+	children = [inner] + [Node(Role.BUTTON, label) for label in buttons]
+	return Node(Role.TABLEROW, name, children=children, focusable=False)
+
+
+def message_menu(options=("Responder", "Copiar", "Apagar"), reactions=("Curtir", "Amei")):
+	"""Menu antigo da mensagem (WAWebDropdown): application > lista > [reacoes, separador, opcoes]."""
+	tray = Node(Role.SECTION, "", children=[Node(Role.BUTTON, r, states={State.FOCUSABLE}) for r in reactions])
+	items = [Node(Role.BUTTON, o, states={State.FOCUSABLE}) for o in options]
+	listing = Node(Role.LIST, "", children=[tray, Node(Role.SEPARATOR, "")] + items)
+	return Node(Role.APPLICATION, "", children=[listing]), tray, items
+
+
 class Page:
 	"""document > [lateral(lista de conversas), principal(cabecalho, mensagens, campo de digitacao)]."""
 

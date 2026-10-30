@@ -11,18 +11,28 @@ NVDA e para o programa. A 1.4.x engolia NVDA+Espaço e NVDA+Shift+I no sistema
 inteiro porque o fallback era ``gesture.send()``.
 """
 
+import time
+
 import addonHandler
 import api
 import globalPluginHandler
+import inputCore
 import ui
 from logHandler import log
 from scriptHandler import script
 from speech.extensions import filter_speechSequence
 
-from . import context, diag, filters, messagetext, overlays, recovery, settings, tree, webmode
+from . import context, diag, filters, menu, messagetext, overlays, recovery, settings, tree, webmode
 from .context import document_url, find_document, forget_kinds, forget_web, raw_context, wa_context
 
 addonHandler.initTranslation()
+
+# Setas que o add-on assume dentro de um menu do WhatsApp (ver menu.py).
+_MENU_ARROWS = {
+	inputCore.normalizeGestureIdentifier("kb:downArrow"): "menuNext",
+	inputCore.normalizeGestureIdentifier("kb:upArrow"): "menuPrevious",
+}
+_MENU_ENTER = inputCore.normalizeGestureIdentifier("kb:enter")
 
 
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
@@ -35,6 +45,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		settings.add_panel()
 		filter_speechSequence.register(filters.on_speech_sequence)
 		recovery.reset()
+		menu.reset()
 		diag.reset()
 		recovery.register_keys()
 
@@ -42,6 +53,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		filter_speechSequence.unregister(filters.on_speech_sequence)
 		recovery.unregister_keys()
 		recovery.reset()
+		menu.reset()
 		# Solta referências a objetos do WhatsApp e vereditos guardados (a recarga
 		# do NVDA+Ctrl+F3 cria um pacote novo; nada pode ficar apontando para o velho).
 		overlays.reset_page_memory()
@@ -65,12 +77,56 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		"""
 		if context.active() is None:  # foco fora do WhatsApp: nada a fazer, sem COM
 			return None
+		if menu.active() is not None:
+			name = self._menu_arrow(gesture)
+			if name is not None:
+				return getattr(self, "script_" + name)
 		found = super().getScript(gesture)
 		if found is None:
 			return None
 		if not self._in_whatsapp():
 			return None
 		return found
+
+	def _menu_arrow(self, gesture):
+		"""Nome do script do menu (setas; Enter só com opção falada "por fora"), ou None."""
+		try:
+			identifiers = gesture.normalizedIdentifiers
+		except Exception:
+			return None
+		for identifier in identifiers:
+			name = _MENU_ARROWS.get(identifier)
+			if name is not None:
+				try:
+					focus = api.getFocusObject()
+				except Exception:
+					return None
+				if self._in_whatsapp() and menu.handles_arrows(focus):
+					return name
+				return None
+			if identifier == _MENU_ENTER:
+				# Enter só é do add-on com uma opção falada "por fora" (ver menu.py).
+				try:
+					focus = api.getFocusObject()
+				except Exception:
+					return None
+				if menu.virtual_target(focus) is not None and self._in_whatsapp():
+					return "menuActivate"
+				return None
+		return None
+
+	# Sem @script nem gesto: só valem dentro de um menu (getScript decide).
+	@diag.scripted
+	def script_menuNext(self, gesture):
+		menu.move(1, gesture)
+
+	@diag.scripted
+	def script_menuPrevious(self, gesture):
+		menu.move(-1, gesture)
+
+	@diag.scripted
+	def script_menuActivate(self, gesture):
+		menu.activate(gesture)
 
 	@staticmethod
 	def _in_whatsapp():
@@ -100,9 +156,28 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		# Primeira coisa: decidir, UMA vez, onde o foco está. Fora do WhatsApp e
 		# fora de um navegador isto lê só o nome do programa (sem COM) e o
 		# evento segue intacto.
+		# Mede só o tempo do add-on: o que o NVDA e o WhatsApp gastam depois
+		# (``nextHandler``: fala, buffer) é descontado.
+		spent = [0.0]
+
+		def timed_next():
+			begin = time.monotonic()
+			try:
+				nextHandler()
+			finally:
+				spent[0] += time.monotonic() - begin
+
+		started = time.monotonic()
+		try:
+			self._on_gain_focus(obj, timed_next)
+		finally:
+			diag.slow("foco", started + spent[0], obj)
+
+	def _on_gain_focus(self, obj, nextHandler):
 		was_web = context.active() == "web"
 		kind = context.update_focus(obj)
 		if kind is None:
+			menu.reset()
 			if was_web:
 				webmode.restore_last_mode()
 				diag.act("contexto", "saiu do WhatsApp Web", key="contexto:saiu")
@@ -125,7 +200,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		try:
 			if wa_context() is not None:
 				overlays.note_page_focus(obj)
-				handled = recovery.handle_gain_focus(obj, deliver)
+				handled = menu.handle_gain_focus(obj, deliver) or recovery.handle_gain_focus(obj, deliver)
+			else:
+				menu.reset()
 		except Exception:
 			log.debugWarning("WhatsApp Unificado: falha ao tratar o foco", exc_info=True)
 			handled = bool(called)
@@ -153,7 +230,8 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			return
 		for child in tree.iter_children_reversed(container, limit=60):
 			if tree.safe_role(child) in tree.ROW_ROLES:
-				child.setFocus()
+				# A linha não aceita foco: o foco vai para o div focável dela.
+				(tree.focusable_in(child) or child).setFocus()
 				return
 		container.setFocus()
 

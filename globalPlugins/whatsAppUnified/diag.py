@@ -5,7 +5,8 @@ Serve para descobrir "o add-on está mexendo em algo fora do WhatsApp?". Cada
 linha começa com ``WhatsAppUnificado:`` e diz o que o add-on fez (overlay
 aplicado, foco adiado ou recuperado, script executado, fala filtrada, modo foco
 fixado ou solto). Limites, para o log não encher:
-- no máximo uma linha por ação a cada 2 segundos;
+- no máximo uma linha por ação (e por classe, no caso de sobreposição) a cada 2 segundos;
+- gancho do add-on que demora mais de 100 ms vira uma linha "lento" (com o tempo);
 - no máximo 200 linhas por sessão do NVDA (a 201ª é só o aviso de que parou).
 NUNCA registra conteúdo de mensagem: só papel, nome de classe, nome do programa
 e o TAMANHO de um texto. A opção "Registrar ações no log do NVDA (diagnóstico)"
@@ -63,6 +64,25 @@ def act(action, detail="", key=None):
 		pass
 
 
+# Um gancho do add-on que passa disto vira uma linha "lento" no log: serve para
+# separar "o add-on atrasou" de "o WhatsApp ou o navegador travou".
+SLOW_S = 0.1
+
+
+def slow(what, started, obj=None):
+	"""Registra ``what`` como lento se passou de SLOW_S desde ``started`` (time.monotonic)."""
+	try:
+		elapsed = time.monotonic() - started
+		if elapsed < SLOW_S:
+			return
+		detail = "%s %d ms" % (what, int(elapsed * 1000))
+		if obj is not None:
+			detail += " " + describe(obj)
+		act("lento", detail, key="lento:" + what)
+	except Exception:
+		pass
+
+
 def role_name(obj):
 	"""Papel do objeto como texto curto (nunca o nome nem o valor)."""
 	try:
@@ -86,6 +106,10 @@ def scripted(func):
 	def wrapper(self, gesture, *args, **kwargs):
 		name = func.__name__
 		act("script", name.replace("script_", ""), key="script:" + name)
-		return func(self, gesture, *args, **kwargs)
+		started = time.monotonic()
+		try:
+			return func(self, gesture, *args, **kwargs)
+		finally:
+			slow("script:" + name.replace("script_", ""), started)
 
 	return wrapper

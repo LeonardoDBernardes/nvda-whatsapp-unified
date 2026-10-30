@@ -29,7 +29,9 @@ from .tree import (
 	ancestors,
 	find_composer,
 	is_chat_list_container,
+	is_inner_focus,
 	new_deadline,
+	row_ancestor,
 	safe_parent,
 	safe_role,
 )
@@ -366,12 +368,22 @@ def classify_container(container):
 
 
 def row_kind(obj):
-	"""'chat' | 'message' | None para linhas e células do WhatsApp.
+	"""'chat' | 'message' | None para linhas, células e o div focável de uma linha.
 
 	- linha ou célula dentro de uma lista de conversas (nome acessível) = 'chat';
-	- linha fora dela e dentro do painel da conversa = 'message'.
+	- linha fora dela e dentro do painel da conversa = 'message';
+	- div focável (SECTION) dentro de uma linha: o tipo da linha. É ESTE o objeto
+	  que recebe o foco quando se anda pelas conversas e mensagens.
 	"""
 	role = safe_role(obj)
+	if is_inner_focus(obj):
+		row = row_ancestor(obj)
+		if row is None:
+			return None
+		container = safe_parent(row)
+		if container is None:
+			return None
+		return classify_container(container)
 	if role in CELL_ROLES:
 		row = safe_parent(obj)
 		container = safe_parent(row) if row is not None and safe_role(row) in ROW_ROLES else row

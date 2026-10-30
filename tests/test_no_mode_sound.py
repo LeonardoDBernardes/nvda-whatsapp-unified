@@ -118,16 +118,62 @@ def test_returning_to_whatsapp_after_another_document_stays_silent():
 	assert browseMode.sounds == []
 
 
-def test_escape_is_sent_to_the_page_and_keeps_focus_mode_silently():
+def test_escape_is_native_and_goes_to_browse_mode_like_nvda():
+	"""Relato do Leo (30/10): na 1.4, Espaco e depois Esc abria o menu da mensagem em modo de navegacao."""
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
 	page.attach(ti)
 	enter(ti, page)
+	focus(page.msg_rows[0].lastChild)  # botao "Menu" da mensagem
+	gesture = Gesture("escape")
+	ti.script_disablePassThrough(gesture)
+	assert gesture.sent == 0
+	assert ti.passThrough is False
+	assert ti._wa_lock is False
+	assert browseMode.sounds == ["browseMode.wav"]  # o som nativo, de proposito
+
+
+def test_escape_on_a_menu_item_goes_to_the_page_to_close_the_menu():
+	page = Page()
+	item = Node(Role.MENUITEM, "Responder", states={State.FOCUSABLE})
+	page.main.add(Node(Role.POPUPMENU, "", children=[item]))
+	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
+	enter(ti, page)
+	focus(item)
 	gesture = Gesture("escape")
 	ti.script_disablePassThrough(gesture)
 	assert gesture.sent == 1
-	assert ti.passThrough is True
+	assert ti.passThrough is True and ti._wa_lock is True
 	assert browseMode.sounds == []
+
+
+def test_after_escape_the_lock_comes_back_on_the_composer_or_a_message():
+	page = Page()
+	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
+	enter(ti, page)
+	ti.script_disablePassThrough(Gesture("escape"))
+	assert ti.passThrough is False
+	browseMode.sounds.clear()
+	ti.event_gainFocus(page.composer, lambda: None)
+	assert ti.passThrough is True and ti._wa_lock is True
+	ti.script_disablePassThrough(Gesture("escape"))
+	browseMode.sounds.clear()
+	row = page.msg_rows[1]
+	apply_overlays(row, {"web"})
+	focus(row)
+	ti.event_gainFocus(row, lambda: None)
+	assert ti.passThrough is True and ti._wa_lock is True
+
+
+def test_escape_does_not_turn_on_nvda_auto_pass_through_lock():
+	page = Page()
+	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
+	enter(ti, page)
+	assert ti.disableAutoPassThrough is False  # nunca fixado pelo add-on: o Esc fica nativo
+	assert ti._wa_lock is True
 
 
 def test_nvda_space_is_native_and_plays_the_sound_only_on_purpose():
@@ -147,7 +193,6 @@ def test_nvda_space_is_native_and_plays_the_sound_only_on_purpose():
 	assert browseMode.sounds == ["browseMode.wav"]
 	browseMode.toggle_pass_through(ti)  # NVDA+Espaco de novo: volta ao modo foco fixo
 	assert ti.passThrough is True
-	assert ti.disableAutoPassThrough is True
 	assert browseMode.sounds == ["browseMode.wav", "focusMode.wav"]
 	run_sequence(ti, page)
 	assert browseMode.sounds == ["browseMode.wav", "focusMode.wav"]
@@ -227,7 +272,7 @@ def test_old_disable_focus_lock_stored_as_text_false_does_not_disable_the_mode()
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
 	page.attach(ti)
-	assert ti.passThrough is True and ti.disableAutoPassThrough is True
+	assert ti.passThrough is True and ti._wa_lock is True
 
 
 def test_document_without_a_confirmed_address_is_not_taken_for_whatsapp_by_title():
@@ -251,11 +296,11 @@ def test_navigating_the_same_buffer_to_another_site_releases_the_pinned_mode_sil
 	ti = WhatsAppChromeVBuf(page.doc)
 	page.attach(ti)
 	enter(ti, page)
-	assert ti.passThrough is True and ti.disableAutoPassThrough is True
+	assert ti.passThrough is True and ti._wa_lock is True
 	browseMode.sounds.clear()
 	page.doc.IAccessibleObject.url = "https://www.example.com/"  # SPA/navegacao no mesmo buffer
 	ti.event_gainFocus(page.msg_rows[0], lambda: None)
-	assert ti.disableAutoPassThrough is False
+	assert ti._wa_lock is False
 	assert ti.passThrough is False  # volta a regra nativa (linha = navegacao)
 	assert browseMode.sounds == []  # a soltura em si e silenciosa
 	ti.event_gainFocus(page.composer, lambda: None)
@@ -269,11 +314,11 @@ def test_navigating_back_to_whatsapp_pins_again():
 	focus(page.msg_rows[0])
 	page.doc.IAccessibleObject.url = "https://www.example.com/"
 	ti.event_gainFocus(page.msg_rows[0], lambda: None)
-	assert ti.disableAutoPassThrough is False
+	assert ti._wa_lock is False
 	page.doc.IAccessibleObject.url = "https://web.whatsapp.com/"
 	browseMode.sounds.clear()
 	ti.event_gainFocus(page.msg_rows[0], lambda: None)
-	assert ti.passThrough is True and ti.disableAutoPassThrough is True
+	assert ti.passThrough is True and ti._wa_lock is True
 	assert browseMode.sounds == []
 
 

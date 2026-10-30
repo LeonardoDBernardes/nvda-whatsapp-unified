@@ -26,6 +26,7 @@ SPEC = {
 	"filterTalvez": "boolean(default=True)",
 	"autoFocusMode": "boolean(default=True)",  # modo foco automático no WhatsApp Web
 	"focusRecovery": "boolean(default=True)",  # recuperar o foco perdido
+	"menuStartOnOptions": "boolean(default=True)",  # menu da mensagem abre nas opções, não nas reações
 	"diagLog": "boolean(default=True)",  # registrar as ações do add-on no log do NVDA (diagnóstico)
 }
 
@@ -37,6 +38,7 @@ DEFAULTS = {
 	"filterTalvez": True,
 	"autoFocusMode": True,
 	"focusRecovery": True,
+	"menuStartOnOptions": True,
 	"diagLog": True,
 }
 
@@ -149,6 +151,14 @@ class WhatsAppUnifiedSettings(SettingsPanel):
 		)
 		self.focusRecovery.SetValue(bool(get("focusRecovery")))
 
+		self.menuStartOnOptions = helper.addItem(
+			wx.CheckBox(
+				self,
+				label=_("Menu da mensagem começa nas opções (Responder, Copiar), não nas reações"),
+			),
+		)
+		self.menuStartOnOptions.SetValue(bool(get("menuStartOnOptions")))
+
 		self.diagLog = helper.addItem(
 			wx.CheckBox(self, label=_("Registrar ações no log do NVDA (diagnóstico)")),
 		)
@@ -164,6 +174,7 @@ class WhatsAppUnifiedSettings(SettingsPanel):
 		section["filterTalvez"] = self.filterTalvez.IsChecked()
 		section["autoFocusMode"] = self.autoFocusMode.IsChecked()
 		section["focusRecovery"] = self.focusRecovery.IsChecked()
+		section["menuStartOnOptions"] = self.menuStartOnOptions.IsChecked()
 		section["diagLog"] = self.diagLog.IsChecked()
 		# O interruptor antigo deixa de valer quando o usuário salva o painel novo:
 		# a chave é APAGADA (regravar False deixaria um texto 'False' no arquivo).

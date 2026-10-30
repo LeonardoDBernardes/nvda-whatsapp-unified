@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>WhatsApp Unified 2.0.1</title>
+  <title>WhatsApp Unified 2.0.2</title>
   <style>
     html {
       color: #1a1a1a;
@@ -166,10 +166,10 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">WhatsApp Unified 2.0.1</h1>
+<h1 class="title">WhatsApp Unified 2.0.2</h1>
 </header>
-<h1 id="whatsapp-unified-201--whatsapp-accessibility-for-nvda">WhatsApp
-Unified 2.0.1 — WhatsApp accessibility for NVDA</h1>
+<h1 id="whatsapp-unified-202--whatsapp-accessibility-for-nvda">WhatsApp
+Unified 2.0.2 — WhatsApp accessibility for NVDA</h1>
 <p>NVDA add-on for <strong>WhatsApp Desktop</strong> (the Microsoft
 Store app, which uses WebView2) and for <strong>WhatsApp Web</strong>
 (Chrome, Edge, Brave and other Chromium-based browsers).</p>
@@ -301,9 +301,10 @@ if you selected a piece of text</strong>, the key goes to WhatsApp.</td>
 </tr>
 </tbody>
 </table>
-<p>No other key is taken. In particular, <strong>NVDA+Space</strong> and
-<strong>Esc</strong> remain NVDA's and WhatsApp's own (see the focus
-mode section).</p>
+<p>Inside a WhatsApp menu, in focus mode, up and down arrow walk the
+options (see "What changed in 2.0.2"). No other key is taken. In
+particular, <strong>NVDA+Space</strong> and <strong>Esc</strong> remain
+NVDA's and WhatsApp's own (see the focus mode section).</p>
 <p>NVDA+Shift+H was checked against the NVDA 2026.2 commands and is
 free. NVDA+Shift+I is no longer used: in NVDA 2026.2 it is the magnifier
 color filter.</p>
@@ -361,6 +362,13 @@ sound</td>
 <td>Turns on focus recovery.</td>
 </tr>
 <tr class="even">
+<td>Message menu starts on the options (Reply, Copy), not on the
+reactions</td>
+<td>Yes</td>
+<td>When the message menu opens, focus goes straight to the first
+option. Up arrow on the first option goes to the reactions.</td>
+</tr>
+<tr class="odd">
 <td>Log add-on actions in the NVDA log (diagnostics)</td>
 <td>Yes (in this test version)</td>
 <td>Writes a line starting with <code>WhatsAppUnificado:</code> to the
@@ -423,8 +431,12 @@ sound</strong>, because it is your deliberate choice. If you leave focus
 mode, the add-on respects it: rows and buttons do not pull focus mode
 back; only the composer does, as NVDA already does. Pressing NVDA+Space
 again returns to the pinned focus mode.</li>
-<li><strong>Esc</strong> goes to WhatsApp (closes the chat, cancels a
-reply) instead of leaving focus mode and playing the sound.</li>
+<li><strong>Esc</strong> is NVDA's, as in 1.4: in focus mode it switches
+to browse mode (with the sound); a second Esc goes to WhatsApp. On a
+menu item Esc closes the menu. After an Esc, the pinned focus mode comes
+back by itself when focus reaches the message field, a chat or a
+message. (In 2.0.0 and 2.0.1 Esc went straight to WhatsApp, which broke
+the "Space then Esc" on the message menu.)</li>
 <li><strong>Other sites</strong> are never affected: the add-on's buffer
 is only used when the address is WhatsApp's.</li>
 </ul>
@@ -446,10 +458,11 @@ something like "grid", "document" or nothing.</p>
 <li>The add-on remembers the last chat or message that had focus.</li>
 <li>If focus falls to one of those places and <strong>you did not
 press</strong> a key that takes focus away on purpose (Esc, Tab, Enter,
-F6, Windows), it does <strong>not</strong> speak the container right
-away. It waits 200 ms. A recent <strong>mouse click</strong> (or a
-pressed button) also counts as legitimate movement: in that case the
-add-on recovers nothing and the focus is spoken normally.</li>
+Space, F6, F10, Windows, Applications), it does <strong>not</strong>
+speak the container right away. It waits 200 ms. A recent <strong>mouse
+click</strong> (or a pressed button) also counts as legitimate movement:
+in that case the add-on recovers nothing and the focus is spoken
+normally.</li>
 <li>If focus is still there, it returns focus to the remembered row. If
 that row was unmounted, it uses the selected row of the same list, then
 the closest one by position, then the first. NVDA speaks the row
@@ -460,6 +473,39 @@ normally.</li>
 <p>It also helps with this: after Alt+Tab, messages lose their names in
 WhatsApp; the add-on reads the text of the message parts when the name
 comes back empty.</p>
+<h2 id="what-changed-in-202-messages-message-menu-and-esc">What changed
+in 2.0.2 (messages, message menu and Esc)</h2>
+<p>Leo's reports with 2.0.1 (30/10/2026) and what was found in
+WhatsApp's code of 29/10:</p>
+<ol type="1">
+<li><strong>Message commands work again.</strong> NVDA's focus sits on a
+block inside the message row, not on the row; 2.0.x only recognized the
+row, so Ctrl+C, Shift+Enter, Ctrl+R and the others did nothing. Now the
+block is recognized and the commands look for the buttons in its row.
+The same applies to the chat list and to Alt+2.</li>
+<li><strong>The message menu starts on Reply, not on the
+reactions.</strong> WhatsApp added a reactions row at the top of the
+menu and, for keyboard users, focuses the first reaction. The add-on
+moves focus to the first option without speaking the reaction (new
+option, on by default).</li>
+<li><strong>Arrows in the menu no longer slip to the message
+below.</strong> Inside a menu, in focus mode, down and up arrow walk
+only the options (wrapping at the end). Up arrow on the first option
+goes to the reactions. If WhatsApp refuses focus on the option, the
+add-on speaks it and Enter activates it (as 1.4 did in the app). In
+browse mode and in text fields the arrows stay NVDA's.</li>
+<li><strong>Native Esc again on the Web</strong> (focus mode
+section).</li>
+<li><strong>Space, the Applications key and F10 count as keys that move
+focus on purpose</strong>: focus recovery no longer pulls focus back to
+the message while the menu opens (in the app Space had stopped opening
+the menu).</li>
+<li><strong>Slowness diagnostics</strong>: with the log on, whenever the
+add-on itself spends more than 100 ms (choosing classes, focus event,
+command, app host pane), the log shows a <code>lento ... N ms</code>
+line. This separates the add-on's delay from WhatsApp's, Chrome's or
+NVDA's.</li>
+</ol>
 <h2 id="what-changed-in-201-isolation">What changed in 2.0.1
 (isolation)</h2>
 <p>Leo's report with 2.0.0: "it is influencing other windows". Cause and
@@ -545,9 +591,10 @@ and what NVDA does instead</h2>
 navigation (<code>MessageMenuItemNav</code>,
 <code>_MenuNavBase</code>)</td>
 <td>The menu base class was never initialized on overlay objects, raised
-errors and swallowed the arrows in menus. Focus mode already hands the
-arrows to WhatsApp.</td>
-<td>WhatsApp's own arrows, in focus mode.</td>
+errors and swallowed the arrows in menus.</td>
+<td>2.0.2 brings back a new, single menu navigation for app and Web
+(<code>menu.py</code>) that really moves focus and only speaks "from
+outside" when WhatsApp refuses focus.</td>
 </tr>
 <tr class="even">
 <td>"Safe" Left and Right arrows</td>
@@ -646,8 +693,8 @@ empty. Pressing an arrow once also restores the names.</p>
 <h3 id="focus-recovery-gets-in-the-way">Focus recovery gets in the
 way</h3>
 <p>Turn off "Recover focus when WhatsApp loses it". It never acts right
-after Esc, Tab, Enter, F6, Windows or a mouse click, and at most once
-per second.</p>
+after Esc, Tab, Enter, Space, F6, F10, Windows, Applications or a mouse
+click, and at most once per second.</p>
 <h3 id="my-old-nvdaini">My old <code>nvda.ini</code></h3>
 <p>The <code>whatsAppUnified</code> section stays the same. Old keys are
 tolerated.</p>
@@ -672,7 +719,7 @@ tolerated.</p>
 └── build.sh           builds the .nvda-addon</code></pre>
 <pre><code>python3 -m pytest tests                  # tests with a simulated NVDA
 python3 tests/check_nvda_api.py          # checks every API against the NVDA 2026.2 source
-./build.sh                               # builds whatsAppUnified-2.0.1.nvda-addon</code></pre>
+./build.sh                               # builds whatsAppUnified-2.0.2.nvda-addon</code></pre>
 <p>The stubs in <code>tests/stubs/</code> faithfully reproduce the part
 of <code>browseMode.py</code> that decides the mode and plays the sound;
 the control test proves that, without the add-on, the sound plays over
@@ -703,6 +750,6 @@ control, Portuguese documentation, the 2.0 rewrite.</li>
 </ol>
 <p>The NVDA 2026.2 code (NV Access, GPL-2) was the reference for every
 API used.</p>
-<p>Current version: <strong>2.0.1</strong>.</p>
+<p>Current version: <strong>2.0.2</strong>.</p>
 </body>
 </html>

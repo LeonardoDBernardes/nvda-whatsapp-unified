@@ -1,4 +1,4 @@
-# WhatsApp Unified 2.0.1 — WhatsApp accessibility for NVDA
+# WhatsApp Unified 2.0.2 — WhatsApp accessibility for NVDA
 
 NVDA add-on for **WhatsApp Desktop** (the Microsoft Store app, which uses WebView2) and for **WhatsApp Web** (Chrome, Edge, Brave and other Chromium-based browsers).
 
@@ -43,7 +43,7 @@ NVDA add-on for **WhatsApp Desktop** (the Microsoft Store app, which uses WebVie
 | Alt+C | The same, but opens the text in a plain text window. |
 | Ctrl+C | Copies the message text and says "Copied". With no text, **or if you selected a piece of text**, the key goes to WhatsApp. |
 
-No other key is taken. In particular, **NVDA+Space** and **Esc** remain NVDA's and WhatsApp's own (see the focus mode section).
+Inside a WhatsApp menu, in focus mode, up and down arrow walk the options (see "What changed in 2.0.2"). No other key is taken. In particular, **NVDA+Space** and **Esc** remain NVDA's and WhatsApp's own (see the focus mode section).
 
 NVDA+Shift+H was checked against the NVDA 2026.2 commands and is free. NVDA+Shift+I is no longer used: in NVDA 2026.2 it is the magnifier color filter.
 
@@ -60,6 +60,7 @@ NVDA → Preferences → Settings → **WhatsApp Unified**. They take effect imm
 | Remove "Maybe" before contact names | Yes | "Maybe John" becomes "John", only in the chat name or the message sender. Never inside a message's text. |
 | Keep focus mode automatically on WhatsApp Web, with no mode switch sound | Yes | Turns on the part described in the next section. |
 | Recover focus when WhatsApp loses it | Yes | Turns on focus recovery. |
+| Message menu starts on the options (Reply, Copy), not on the reactions | Yes | When the message menu opens, focus goes straight to the first option. Up arrow on the first option goes to the reactions. |
 | Log add-on actions in the NVDA log (diagnostics) | Yes (in this test version) | Writes a line starting with `WhatsAppUnificado:` to the NVDA log (INFO level, open it with NVDA+F1) whenever the add-on acts: overlay applied, focus deferred or recovered, script run, speech filtered, focus mode pinned or released. At most one line per action every 2 seconds and 200 lines per session. It never records message text, only the object's role and the text length. |
 
 The old `disableFocusLock` option (1.x) was merged into "Keep focus mode automatically". If it was on in your `nvda.ini`, 2.0 honors that until you save the new panel.
@@ -87,7 +88,7 @@ A buffer class of its own (`WhatsAppChromeVBuf`, derived from the Chromium one) 
 ### What stays native
 
 - **NVDA+Space** remains NVDA's and **plays the sound**, because it is your deliberate choice. If you leave focus mode, the add-on respects it: rows and buttons do not pull focus mode back; only the composer does, as NVDA already does. Pressing NVDA+Space again returns to the pinned focus mode.
-- **Esc** goes to WhatsApp (closes the chat, cancels a reply) instead of leaving focus mode and playing the sound.
+- **Esc** is NVDA's, as in 1.4: in focus mode it switches to browse mode (with the sound); a second Esc goes to WhatsApp. On a menu item Esc closes the menu. After an Esc, the pinned focus mode comes back by itself when focus reaches the message field, a chat or a message. (In 2.0.0 and 2.0.1 Esc went straight to WhatsApp, which broke the "Space then Esc" on the message menu.)
 - **Other sites** are never affected: the add-on's buffer is only used when the address is WhatsApp's.
 
 ### Limits
@@ -100,11 +101,22 @@ A buffer class of its own (`WhatsAppChromeVBuf`, derived from the Chromium one) 
 WhatsApp mounts and unmounts rows as you scroll (the lists are virtualized). When the focused row is unmounted, focus falls to the list container, the page body or the document, and the screen reader says something like "grid", "document" or nothing.
 
 1. The add-on remembers the last chat or message that had focus.
-2. If focus falls to one of those places and **you did not press** a key that takes focus away on purpose (Esc, Tab, Enter, F6, Windows), it does **not** speak the container right away. It waits 200 ms. A recent **mouse click** (or a pressed button) also counts as legitimate movement: in that case the add-on recovers nothing and the focus is spoken normally.
+2. If focus falls to one of those places and **you did not press** a key that takes focus away on purpose (Esc, Tab, Enter, Space, F6, F10, Windows, Applications), it does **not** speak the container right away. It waits 200 ms. A recent **mouse click** (or a pressed button) also counts as legitimate movement: in that case the add-on recovers nothing and the focus is spoken normally.
 3. If focus is still there, it returns focus to the remembered row. If that row was unmounted, it uses the selected row of the same list, then the closest one by position, then the first. NVDA speaks the row normally.
 4. If it finds nothing, it speaks the original focus. At most **one recovery per second**: it never loops.
 
 It also helps with this: after Alt+Tab, messages lose their names in WhatsApp; the add-on reads the text of the message parts when the name comes back empty.
+
+## What changed in 2.0.2 (messages, message menu and Esc)
+
+Leo's reports with 2.0.1 (30/10/2026) and what was found in WhatsApp's code of 29/10:
+
+1. **Message commands work again.** NVDA's focus sits on a block inside the message row, not on the row; 2.0.x only recognized the row, so Ctrl+C, Shift+Enter, Ctrl+R and the others did nothing. Now the block is recognized and the commands look for the buttons in its row. The same applies to the chat list and to Alt+2.
+2. **The message menu starts on Reply, not on the reactions.** WhatsApp added a reactions row at the top of the menu and, for keyboard users, focuses the first reaction. The add-on moves focus to the first option without speaking the reaction (new option, on by default).
+3. **Arrows in the menu no longer slip to the message below.** Inside a menu, in focus mode, down and up arrow walk only the options (wrapping at the end). Up arrow on the first option goes to the reactions. If WhatsApp refuses focus on the option, the add-on speaks it and Enter activates it (as 1.4 did in the app). In browse mode and in text fields the arrows stay NVDA's.
+4. **Native Esc again on the Web** (focus mode section).
+5. **Space, the Applications key and F10 count as keys that move focus on purpose**: focus recovery no longer pulls focus back to the message while the menu opens (in the app Space had stopped opening the menu).
+6. **Slowness diagnostics**: with the log on, whenever the add-on itself spends more than 100 ms (choosing classes, focus event, command, app host pane), the log shows a `lento ... N ms` line. This separates the add-on's delay from WhatsApp's, Chrome's or NVDA's.
 
 ## What changed in 2.0.1 (isolation)
 
@@ -135,7 +147,7 @@ Leo's report with 2.0.0: "it is influencing other windows". Cause and fix:
 
 | Removed in 2.0 | Why | Instead |
 |---|---|---|
-| Own Up and Down arrows and Ctrl+Enter in the app, and own menu navigation (`MessageMenuItemNav`, `_MenuNavBase`) | The menu base class was never initialized on overlay objects, raised errors and swallowed the arrows in menus. Focus mode already hands the arrows to WhatsApp. | WhatsApp's own arrows, in focus mode. |
+| Own Up and Down arrows and Ctrl+Enter in the app, and own menu navigation (`MessageMenuItemNav`, `_MenuNavBase`) | The menu base class was never initialized on overlay objects, raised errors and swallowed the arrows in menus. | 2.0.2 brings back a new, single menu navigation for app and Web (`menu.py`) that really moves focus and only speaks "from outside" when WhatsApp refuses focus. |
 | "Safe" Left and Right arrows | They hid the caret announcement in text fields. | WhatsApp and text field arrows, undisturbed. |
 | Own NVDA+Space script | It swallowed the NVDA command system-wide. | **Native NVDA+Space** (toggles focus and browse mode). |
 | NVDA+arrow "review last spoken text" | They shadowed NVDA's native review. | NVDA's review cursor (for example, desktop layout: Numpad 7, 8 and 9 for lines; 4, 5 and 6 for words; 1, 2 and 3 for characters). |
@@ -172,7 +184,7 @@ That is WhatsApp: it strips message names until you use the keyboard again. The 
 
 ### Focus recovery gets in the way
 
-Turn off "Recover focus when WhatsApp loses it". It never acts right after Esc, Tab, Enter, F6, Windows or a mouse click, and at most once per second.
+Turn off "Recover focus when WhatsApp loses it". It never acts right after Esc, Tab, Enter, Space, F6, F10, Windows, Applications or a mouse click, and at most once per second.
 
 ### My old `nvda.ini`
 
@@ -204,7 +216,7 @@ whatsapp-unified/
 ```
 python3 -m pytest tests                  # tests with a simulated NVDA
 python3 tests/check_nvda_api.py          # checks every API against the NVDA 2026.2 source
-./build.sh                               # builds whatsAppUnified-2.0.1.nvda-addon
+./build.sh                               # builds whatsAppUnified-2.0.2.nvda-addon
 ```
 
 The stubs in `tests/stubs/` faithfully reproduce the part of `browseMode.py` that decides the mode and plays the sound; the control test proves that, without the add-on, the sound plays over the same focus path.
@@ -221,4 +233,4 @@ This add-on is **GPL version 2** (`COPYING` file). It was born from the union of
 
 The NVDA 2026.2 code (NV Access, GPL-2) was the reference for every API used.
 
-Current version: **2.0.1**.
+Current version: **2.0.2**.

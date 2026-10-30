@@ -57,7 +57,15 @@ def reset():
 
 class BrowseModeTreeInterceptor(AutoPropertyObject):
 	_disableAutoPassThrough = False
-	IGNORE_DISABLE_PASS_THROUGH_WHEN_FOCUSED_ROLES = frozenset()
+	# browseMode.py:357-364: o Esc num item de menu vai para a pagina (fecha o menu ARIA).
+	IGNORE_DISABLE_PASS_THROUGH_WHEN_FOCUSED_ROLES = frozenset(
+		{
+			controlTypes.Role.MENUITEM,
+			controlTypes.Role.RADIOMENUITEM,
+			controlTypes.Role.CHECKMENUITEM,
+			controlTypes.Role.TABLECELL,
+		},
+	)
 
 	ALWAYS_SWITCH_TO_PASS_THROUGH_ROLES = frozenset(
 		{
@@ -155,6 +163,9 @@ class BrowseModeTreeInterceptor(AutoPropertyObject):
 
 	def script_disablePassThrough(self, gesture):
 		if not self.passThrough or self.disableAutoPassThrough:
+			return gesture.send()
+		obj = api.getFocusObject()
+		if obj and obj.role in self.IGNORE_DISABLE_PASS_THROUGH_WHEN_FOCUSED_ROLES:
 			return gesture.send()
 		self.passThrough = False
 		self.disableAutoPassThrough = False

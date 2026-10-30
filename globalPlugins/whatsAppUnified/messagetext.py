@@ -77,14 +77,15 @@ def collect_texts(obj, min_length=2, budget=TEXT_BUDGET, seconds=TEXT_SECONDS):
 	return texts
 
 
-def message_text(row):
+def message_text(row, focus=None):
 	"""Texto da mensagem.
 
-	Usa o nome da linha quando ele está completo. Se estiver cortado ("… Ler
-	mais") ou vazio, usa o texto dos descendentes. Nome vazio é normal: sem uso
-	do teclado recente o WhatsApp tira o aria-label das mensagens.
+	Usa o nome do elemento em foco (o div da mensagem) ou, sem ele, o da linha,
+	quando está completo. Se estiver cortado ("… Ler mais") ou vazio, usa o texto
+	dos descendentes da linha. Nome vazio é normal: sem uso do teclado recente o
+	WhatsApp tira o aria-label das mensagens.
 	"""
-	name = safe_name(row).strip()
+	name = (safe_name(focus) if focus is not None else "").strip() or safe_name(row).strip()
 	cleaned = READ_MORE_SUFFIX_RE.sub("", name).strip()
 	if name and cleaned == name:
 		return name
@@ -110,7 +111,7 @@ def find_read_more(row, deadline=None):
 	return find_buttons(row, lambda b: bool(READ_MORE_RE.match(safe_name(b))), first=True, deadline=deadline)
 
 
-def expand_then(row, callback):
+def expand_then(row, callback, focus=None):
 	"""Clica em "ler mais" e entrega o texto já expandido.
 
 	A expansão acontece dentro do WhatsApp, em outro processo, então o texto
@@ -120,7 +121,7 @@ def expand_then(row, callback):
 	resposta.
 	"""
 	button = find_read_more(row)
-	before = message_text(row)
+	before = message_text(row, focus)
 	if button is None:
 		callback(before)
 		return
@@ -133,7 +134,7 @@ def expand_then(row, callback):
 		return
 
 	def poll(tries_left):
-		current = message_text(row)
+		current = message_text(row, focus)
 		if len(current) > len(before) or tries_left <= 0:
 			callback(current)
 			return

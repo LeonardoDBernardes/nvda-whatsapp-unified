@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>WhatsApp Unificado 2.0.1</title>
+  <title>WhatsApp Unificado 2.0.2</title>
   <style>
     html {
       color: #1a1a1a;
@@ -166,11 +166,11 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">WhatsApp Unificado 2.0.1</h1>
+<h1 class="title">WhatsApp Unificado 2.0.2</h1>
 </header>
 <h1
-id="whatsapp-unificado-201--acessibilidade-do-whatsapp-para-o-nvda">WhatsApp
-Unificado 2.0.1 — acessibilidade do WhatsApp para o NVDA</h1>
+id="whatsapp-unificado-202--acessibilidade-do-whatsapp-para-o-nvda">WhatsApp
+Unificado 2.0.2 — acessibilidade do WhatsApp para o NVDA</h1>
 <p>Add-on do NVDA para o <strong>WhatsApp Desktop</strong> (o aplicativo
 da Microsoft Store, que usa WebView2) e para o <strong>WhatsApp
 Web</strong> (Chrome, Edge, Brave e outros navegadores baseados em
@@ -304,9 +304,11 @@ você selecionou um trecho</strong>, a tecla segue para o WhatsApp.</td>
 </tr>
 </tbody>
 </table>
-<p>Nenhuma outra tecla é tomada. Em particular,
-<strong>NVDA+Espaço</strong> e <strong>Esc</strong> continuam sendo os
-do NVDA e do WhatsApp (veja a seção sobre o modo foco).</p>
+<p>Dentro de um menu do WhatsApp, em modo foco, as setas para cima e
+para baixo andam pelas opções (veja "O que mudou na 2.0.2"). Nenhuma
+outra tecla é tomada. Em particular, <strong>NVDA+Espaço</strong> e
+<strong>Esc</strong> continuam sendo os do NVDA e do WhatsApp (veja a
+seção sobre o modo foco).</p>
 <p>O NVDA+Shift+H foi conferido contra os comandos do NVDA 2026.2 e está
 livre. O NVDA+Shift+I deixou de ser usado: no NVDA 2026.2 ele é o filtro
 de cor do ampliador.</p>
@@ -365,6 +367,13 @@ de modo</td>
 <td>Liga a recuperação de foco.</td>
 </tr>
 <tr class="even">
+<td>Menu da mensagem começa nas opções (Responder, Copiar), não nas
+reações</td>
+<td>Sim</td>
+<td>Ao abrir o menu da mensagem, o foco vai direto para a primeira
+opção. Seta para cima na primeira opção leva às reações.</td>
+</tr>
+<tr class="odd">
 <td>Registrar ações no log do NVDA (diagnóstico)</td>
 <td>Sim (nesta versão de teste)</td>
 <td>Escreve no log do NVDA (nível INFO, abra com NVDA+F1) uma linha
@@ -429,8 +438,13 @@ som</strong>, porque é uma escolha sua. Se você sai do modo foco, o
 add-on respeita: linhas e botões não puxam o modo foco de volta; só o
 campo de digitação, como o NVDA já faz. Apertando NVDA+Espaço de novo,
 volta o modo foco fixo.</li>
-<li><strong>Esc</strong> vai para o WhatsApp (fecha a conversa, cancela
-resposta), em vez de sair do modo foco e tocar o som.</li>
+<li><strong>Esc</strong> é o do NVDA, como na 1.4: em modo foco ele
+passa para o modo de navegação (com o som); um segundo Esc vai para o
+WhatsApp. Num item de menu o Esc fecha o menu. Depois de um Esc, o modo
+foco fixo volta sozinho quando o foco chega ao campo de digitação, a uma
+conversa ou a uma mensagem. (Na 2.0.0 e 2.0.1 o Esc ia direto para o
+WhatsApp, e isso quebrou o "Espaço e depois Esc" do menu da
+mensagem.)</li>
 <li><strong>Outros sites</strong> nunca são afetados: o buffer do add-on
 só entra quando o endereço é do WhatsApp.</li>
 </ul>
@@ -451,11 +465,11 @@ tela fala algo como "grade", "documento" ou nada.</p>
 <ol type="1">
 <li>O add-on lembra a última conversa ou mensagem que recebeu foco.</li>
 <li>Se o foco cai num desses lugares e <strong>você não apertou</strong>
-uma tecla que tira o foco de propósito (Esc, Tab, Enter, F6, Windows),
-ele <strong>não</strong> fala o contêiner na hora. Espera 200 ms. Um
-<strong>clique de mouse</strong> recente (ou botão apertado) também
-conta como movimento legítimo: nesse caso o add-on não recupera nada e o
-foco é falado normalmente.</li>
+uma tecla que tira o foco de propósito (Esc, Tab, Enter, Espaço, F6,
+F10, Windows, Aplicativos), ele <strong>não</strong> fala o contêiner na
+hora. Espera 200 ms. Um <strong>clique de mouse</strong> recente (ou
+botão apertado) também conta como movimento legítimo: nesse caso o
+add-on não recupera nada e o foco é falado normalmente.</li>
 <li>Se o foco continua lá, devolve o foco à linha lembrada. Se ela foi
 desmontada, usa a linha selecionada da mesma lista, depois a mais
 próxima pela posição, depois a primeira. O NVDA fala a linha
@@ -466,6 +480,40 @@ recuperação por segundo</strong>: nunca entra em laço.</li>
 <p>Também ajuda no seguinte: depois do Alt+Tab as mensagens ficam sem
 nome no WhatsApp; o add-on lê o texto das partes da mensagem quando o
 nome vem vazio.</p>
+<h2 id="o-que-mudou-na-202-mensagens-menu-da-mensagem-e-esc">O que mudou
+na 2.0.2 (mensagens, menu da mensagem e Esc)</h2>
+<p>Relatos do Leo com a 2.0.1 (30/10/2026) e o que foi achado no código
+do WhatsApp de 29/10:</p>
+<ol type="1">
+<li><strong>Os comandos da mensagem voltaram a valer.</strong> O foco do
+NVDA fica num bloco dentro da linha da mensagem, não na linha; a 2.0.x
+só reconhecia a linha, então Ctrl+C, Shift+Enter, Ctrl+R e os outros não
+agiam. Agora o bloco é reconhecido e os comandos procuram os botões na
+linha dele. O mesmo vale para a lista de conversas e para Alt+2.</li>
+<li><strong>Menu da mensagem começa em Responder, não nas
+reações.</strong> O WhatsApp pôs uma fileira de reações no topo do menu
+e, para quem usa teclado, põe o foco na primeira reação. O add-on leva o
+foco à primeira opção sem falar a reação (opção nova, ligada por
+padrão).</li>
+<li><strong>Setas no menu não escorregam mais para a mensagem de
+baixo.</strong> Dentro de um menu, em modo foco, seta para baixo e para
+cima andam só pelas opções (voltando ao início no fim). Seta para cima
+na primeira opção vai para as reações. Se o WhatsApp não aceitar o foco
+na opção, o add-on fala a opção e o Enter a ativa (como a 1.4 fazia no
+aplicativo). Em modo de navegação e em campo de texto as setas continuam
+do NVDA.</li>
+<li><strong>Esc nativo de novo no Web</strong> (seção do modo
+foco).</li>
+<li><strong>Espaço, tecla Aplicativos e F10 contam como teclas que mudam
+o foco de propósito</strong>: a recuperação de foco não puxa mais o foco
+de volta para a mensagem enquanto o menu abre (no aplicativo o Espaço
+tinha deixado de abrir o menu).</li>
+<li><strong>Diagnóstico de lentidão</strong>: com o log ligado, toda vez
+que o próprio add-on gasta mais de 100 ms (escolha de classe, evento de
+foco, comando, painel do aplicativo), o log mostra uma linha
+<code>lento ... N ms</code>. Assim dá para separar o atraso do add-on do
+atraso do WhatsApp, do Chrome ou do NVDA.</li>
+</ol>
 <h2 id="o-que-mudou-na-201-isolamento">O que mudou na 2.0.1
 (isolamento)</h2>
 <p>Relato do Leo com a 2.0.0: "ele está influenciando outras janelas".
@@ -550,9 +598,10 @@ removido e o que o NVDA faz no lugar</h2>
 <td>Setas ↑ e ↓ e Ctrl+Enter próprios no app, e navegação própria de
 menus (<code>MessageMenuItemNav</code>, <code>_MenuNavBase</code>)</td>
 <td>A classe base de menus nunca era inicializada nos objetos de
-sobreposição, dava erro e engolia as setas nos menus. O modo foco já
-entrega as setas ao WhatsApp.</td>
-<td>Setas do próprio WhatsApp, em modo foco.</td>
+sobreposição, dava erro e engolia as setas nos menus.</td>
+<td>Na 2.0.2 voltou uma navegação de menu nova e única para app e Web
+(<code>menu.py</code>), que move o foco de verdade e só fala "por fora"
+quando o WhatsApp não aceita o foco.</td>
 </tr>
 <tr class="even">
 <td>Setas ← e → "protegidas"</td>
@@ -653,8 +702,8 @@ vazio. Apertar uma seta uma vez também restaura os nomes.</p>
 <h3 id="a-recuperação-de-foco-atrapalha">A recuperação de foco
 atrapalha</h3>
 <p>Desligue "Recuperar o foco quando o WhatsApp o perde". Ela nunca age
-logo depois de Esc, Tab, Enter, F6, Windows ou de um clique de mouse, e
-no máximo uma vez por segundo.</p>
+logo depois de Esc, Tab, Enter, Espaço, F6, F10, Windows, Aplicativos ou
+de um clique de mouse, e no máximo uma vez por segundo.</p>
 <h3 id="meu-antigo-nvdaini">Meu antigo <code>nvda.ini</code></h3>
 <p>A seção <code>whatsAppUnified</code> continua a mesma. Chaves antigas
 são toleradas.</p>
@@ -679,7 +728,7 @@ são toleradas.</p>
 └── build.sh           gera o .nvda-addon</code></pre>
 <pre><code>python3 -m pytest tests                  # testes com o NVDA simulado
 python3 tests/check_nvda_api.py          # confere cada API contra o código-fonte do NVDA 2026.2
-./build.sh                               # gera whatsAppUnified-2.0.1.nvda-addon</code></pre>
+./build.sh                               # gera whatsAppUnified-2.0.2.nvda-addon</code></pre>
 <p>Os stubs de <code>tests/stubs/</code> reproduzem fielmente o trecho
 de <code>browseMode.py</code> que decide o modo e toca o som; o teste de
 controle prova que, sem o add-on, o som toca no mesmo percurso de
@@ -711,6 +760,6 @@ de áudio, documentação em português, a reescrita 2.0.</li>
 </ol>
 <p>O código do NVDA 2026.2 (NV Access, GPL-2) foi a referência de cada
 API usada.</p>
-<p>Versão atual: <strong>2.0.1</strong>.</p>
+<p>Versão atual: <strong>2.0.2</strong>.</p>
 </body>
 </html>

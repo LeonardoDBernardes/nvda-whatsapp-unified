@@ -37,6 +37,13 @@ COMPOSER_NAME_RE = re.compile(
 LIST_ROLES = frozenset(r for r in (Role.TABLE, getattr(Role, "DATAGRID", None), Role.LIST) if r is not None)
 ROW_ROLES = frozenset((Role.TABLEROW,))
 CELL_ROLES = frozenset((Role.TABLECELL,))
+# O foco do teclado numa conversa ou mensagem NÃO fica na linha (TABLEROW): fica
+# num div focável DENTRO dela (tabIndex -1, sem papel; o NVDA o chama de SECTION).
+# Código da página, 29/10/2026: a mensagem é ``role="row"`` com o div
+# ``data-testid="conv-msg-..."`` focável e a fileira de botões (reagir, menu).
+INNER_FOCUS_ROLES = frozenset((Role.SECTION,))
+# Quantos níveis acima do div focável a linha pode estar.
+ROW_SEARCH_LEVELS = 4
 
 # Limites para que uma busca nunca congele o NVDA (thread principal).
 # Um comando inteiro gasta no máximo COMMAND_SECONDS, não importa quantas
@@ -171,6 +178,47 @@ def ancestors(obj, limit=12):
 		yield current
 		count += 1
 		current = safe_parent(current)
+
+
+def row_ancestor(obj, levels=ROW_SEARCH_LEVELS):
+	"""A linha (TABLEROW) que contém ``obj``, até ``levels`` níveis acima, ou None.
+
+	Se ``obj`` é o foco, usa a cadeia de ancestrais que o NVDA já montou para o
+	foco (nenhuma chamada nova ao WhatsApp).
+	"""
+	try:
+		focus = api.getFocusObject()
+	except Exception:
+		focus = None
+	if focus is not None and obj is focus:
+		try:
+			chain = list(api.getFocusAncestors())
+		except Exception:
+			chain = []
+		for parent in reversed(chain[-levels:]):
+			if safe_role(parent) in ROW_ROLES:
+				return parent
+		return None
+	for parent in ancestors(obj, levels):
+		if safe_role(parent) in ROW_ROLES:
+			return parent
+	return None
+
+
+def is_inner_focus(obj):
+	"""Div focável de uma linha (o elemento que recebe o foco de verdade)."""
+	if safe_role(obj) not in INNER_FOCUS_ROLES:
+		return False
+	return State.FOCUSABLE in safe_states(obj)
+
+
+def focusable_in(row, budget=40):
+	"""O elemento da linha que pode receber o foco: a própria linha, se focável, senão o div interno."""
+	if row is None:
+		return None
+	if State.FOCUSABLE in safe_states(row):
+		return row
+	return walk(row, is_inner_focus, budget=budget, seconds=0.1)
 
 
 def is_chat_list_container(obj):

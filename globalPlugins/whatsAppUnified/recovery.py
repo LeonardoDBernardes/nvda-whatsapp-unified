@@ -44,7 +44,9 @@ from .tree import (
 	ancestors,
 	is_defunct,
 	document_root,
+	focusable_in,
 	new_deadline,
+	row_ancestor,
 	rows_of,
 	safe_name,
 	safe_role,
@@ -58,8 +60,12 @@ LEGIT_KEY_WINDOW_S = 0.6  # tecla que tira o foco de propósito, de pouco antes
 REMEMBER_FRESH_S = 2.0  # "a linha foi o foco há pouco"
 MOUSE_WINDOW_S = 0.6  # clique ou movimento de mouse de pouco antes também é intencional
 
-# Teclas virtuais que movem o foco de propósito (Esc, Tab, Enter, F6, Windows).
-LEGIT_KEYS = frozenset((0x1B, 0x09, 0x0D, 0x75, 0x5B, 0x5C))
+# Teclas virtuais que movem o foco de propósito (Esc, Tab, Enter, F6, Windows,
+# Espaço, tecla de aplicativos e F10). Espaço e tecla de aplicativos abrem o menu
+# da mensagem (relato do Leo, 30/10/2026: na 2.0.1 o Espaço deixou de abrir o
+# menu no aplicativo; sem elas aqui a recuperação podia puxar o foco de volta
+# para a mensagem enquanto o menu abria).
+LEGIT_KEYS = frozenset((0x1B, 0x09, 0x0D, 0x75, 0x5B, 0x5C, 0x20, 0x5D, 0x79))
 
 
 class _State:
@@ -159,7 +165,9 @@ def remember(obj):
 	_State.row_ref = obj
 	_State.kind = kind
 	_State.name = safe_name(obj)
-	_State.index = _index_of(obj)
+	# O foco fica no div de dentro da linha; a posição é a da linha.
+	row = obj if safe_role(obj) == Role.TABLEROW else row_ancestor(obj)
+	_State.index = _index_of(row if row is not None else obj)
 	_State.seen_at = now()
 
 
@@ -244,18 +252,23 @@ def pick_target(obj):
 		return None
 	remembered = remembered_row()
 	if _alive_same_name(remembered):
-		if any(parent == container for parent in ancestors(remembered, 4)):
+		if any(parent == container for parent in ancestors(remembered, 7)):
 			return remembered
 	rows = rows_of(container)
 	if not rows:
 		return None
-	for row in rows:
-		if State.SELECTED in safe_states(row):
-			return row
-	if kind == "chat":
-		return selected_or_first(rows)
-	index = min(_State.index, len(rows) - 1)
-	return rows[index]
+	row = None
+	for candidate in rows:
+		if State.SELECTED in safe_states(candidate):
+			row = candidate
+			break
+	if row is None:
+		if kind == "chat":
+			row = selected_or_first(rows)
+		else:
+			row = rows[min(_State.index, len(rows) - 1)]
+	# A linha de mensagem não aceita foco: o foco vai para o div focável dela.
+	return focusable_in(row) or row
 
 
 # ─── tratar o evento de foco ─────────────────────────────────────────────────

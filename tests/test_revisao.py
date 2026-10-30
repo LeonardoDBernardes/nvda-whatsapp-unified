@@ -89,7 +89,7 @@ def test_saving_the_panel_deletes_the_old_key_instead_of_rewriting_it():
 
 	section = conf_as_configobj(disableFocusLock="True", autoFocusMode="False")
 	panel = type("FakePanel", (), {})()
-	for name in ("filterMessageList", "filterChatList", "filterUsageHints", "filterTalvez", "autoFocusMode", "focusRecovery", "diagLog"):
+	for name in ("filterMessageList", "filterChatList", "filterUsageHints", "filterTalvez", "autoFocusMode", "focusRecovery", "diagLog", "menuStartOnOptions"):
 		setattr(panel, name, Box(True))
 	panel.scope = Box(True)
 	settings.WhatsAppUnifiedSettings.onSave(panel)

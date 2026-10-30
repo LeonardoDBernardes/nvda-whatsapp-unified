@@ -15,28 +15,29 @@ CAUSA, conferida no código do NVDA 2026.2 (browseMode.py):
   o som toca a cada troca. Entrar no documento vindo de outra aba também toca
   (o ``.last`` é de outro documento).
 
-SOLUÇÃO (a opção (a) do roteiro, a mesma que o próprio NVDA usa no MSHTML,
-virtualBuffers/MSHTML.py:241-250, e no Excel): uma subclasse do buffer do
-Chromium, ``WhatsAppChromeVBuf``, escolhida por sobreposição do documento
+SOLUÇÃO: uma subclasse do buffer do Chromium, ``WhatsAppChromeVBuf``,
+escolhida por sobreposição do documento
 (``WhatsAppWebDocument._get_treeInterceptorClass``). Ela
-1. NASCE em modo foco: ``_passThrough = True`` e ``_disableAutoPassThrough = True``
-   (privados de propósito: o setter público chamaria
-   ``_focusLastFocusableObject`` e puxaria o foco do usuário; o MSHTML faz igual);
+1. NASCE em modo foco: ``_passThrough = True`` (privado de propósito: o setter
+   público chamaria ``_focusLastFocusableObject`` e puxaria o foco do usuário)
+   e com a trava própria ``_wa_lock`` ligada. NÃO usa ``disableAutoPassThrough``
+   (a 2.0.0 e a 2.0.1 usavam, e isso mudava o Esc; ver abaixo);
 2. sincroniza ``reportPassThrough.last`` com o modo dela ao nascer, ao ganhar
    o foco e a cada evento de foco. Assim entrar no documento é SILENCIOSO;
 3. responde SEMPRE a mesma coisa em ``shouldPassThrough(obj, FOCUS|CARET)``
-   enquanto o modo foco está fixado (True). Sem resposta variável não há troca
+   enquanto a trava está ligada (True). Sem resposta variável não há troca
    de modo; sem troca de modo ``reportPassThrough`` nunca toca.
 
 O QUE CONTINUA NATIVO:
-- NVDA+Espaço (``script_toggleVirtualBufferPassThrough``) alterna normalmente e
-  toca o som, porque o ``.last`` está sincronizado com o modo anterior. A escolha
-  do Leo vale: em modo de navegação (``disableAutoPassThrough`` falso) a classe
-  devolve False, exceto em campo de texto editável (o NVDA já faz isso), e volta a
-  ficar em modo foco quando ele alterna de novo;
-- Escape: com ``disableAutoPassThrough`` verdadeiro o script nativo
-  ``script_disablePassThrough`` repassa a tecla à página (fecha conversa, etc.)
-  em vez de sair do modo foco. Sem isso o Escape tocaria o som de navegação;
+- Esc (relato do Leo, 30/10/2026: "barra de espaço e depois Esc" abria o menu da
+  mensagem na 1.4; na 2.0.x o Esc ia para a página e fechava o menu): o Esc
+  sai do modo foco para o modo de navegação, com o som, como no NVDA sem
+  add-on. Num item de menu o NVDA manda o Esc à página (fecha o menu), também
+  como sempre. Depois de um Esc, a trava volta sozinha quando o foco chega ao
+  campo de digitação ou a uma conversa ou mensagem (como a 1.4 fazia);
+- NVDA+Espaço alterna normalmente e toca o som, porque o ``.last`` está
+  sincronizado com o modo anterior. Em modo de navegação escolhido assim a
+  trava só volta em campo de texto ou com NVDA+Espaço de novo;
 - outros sites: a sobreposição só vale se o endereço do documento é
   ``web.whatsapp.com``; qualquer outro documento usa o ChromeVBuf original.
   Se o mesmo buffer navegar para outro endereço, o veredito é refeito e o modo
@@ -106,7 +107,9 @@ class WhatsAppChromeVBuf(ChromeVBuf):
 	"""
 
 	_wa_verdict = False  # só vira True com o endereço confirmado (nunca por suposição)
-	_wa_pinned = False  # modo foco fixado por esta classe
+	_wa_pinned = False  # o add-on cuida do modo deste buffer (WhatsApp Web + opção ligada)
+	_wa_lock = False  # trava: modo foco sem troca, para qualquer objeto
+	_wa_escaped = False  # o modo de navegação veio de um Esc (não de NVDA+Espaço)
 
 	def __init__(self, rootNVDAObject):
 		super().__init__(rootNVDAObject)
@@ -142,7 +145,8 @@ class WhatsAppChromeVBuf(ChromeVBuf):
 		mine = write_last and self._wa_is_active_buffer()
 		if want and not self._wa_pinned:
 			self._wa_pinned = True
-			self._disableAutoPassThrough = True
+			self._wa_lock = True
+			self._wa_escaped = False
 			self._passThrough = True
 			if mine:
 				if _Entry.last is None:
@@ -151,7 +155,8 @@ class WhatsAppChromeVBuf(ChromeVBuf):
 			diag.act("modo-foco-fixado", "buffer=WhatsApp")
 		elif self._wa_pinned and not want:
 			self._wa_pinned = False
-			self._disableAutoPassThrough = False
+			self._wa_lock = False
+			self._wa_escaped = False
 			# Volta à regra nativa para o objeto em foco (sem som: o "último modo
 			# anunciado" passa a ser o modo novo).
 			self._passThrough = self._native_pass_through_for_focus()
@@ -178,16 +183,56 @@ class WhatsAppChromeVBuf(ChromeVBuf):
 
 	# ─── decisão de modo ─────────────────────────────────────────────────────
 
+	def _wa_follow_user(self):
+		"""Acompanha o que o usuário fez com Esc e NVDA+Espaço."""
+		if self._wa_lock and not self.passThrough:
+			# Saiu do modo foco (Esc ou NVDA+Espaço): o modo de navegação é dele.
+			self._wa_lock = False
+		elif not self._wa_lock and self.passThrough:
+			# Voltou ao modo foco (NVDA+Espaço, campo de texto): trava de novo. O
+			# NVDA+Espaço liga ``disableAutoPassThrough``, que mandaria o próximo
+			# Esc à página; a trava do add-on faz o papel dele.
+			self._wa_lock = True
+			self._wa_escaped = False
+			self._disableAutoPassThrough = False
+
+	def _wa_relock(self, obj):
+		"""Em modo de navegação, este foco deve voltar ao modo foco travado?"""
+		if editable_and_available(obj):
+			return True
+		return self._wa_escaped and getattr(obj, "wa_kind", None) in ("chat", "message")
+
 	def shouldPassThrough(self, obj, reason=None):
 		self._wa_update()
 		if reason in (OutputReason.FOCUS, OutputReason.CARET) and self._wa_pinned:
-			if self.disableAutoPassThrough:
-				# Modo foco fixado: SEMPRE a mesma resposta, para qualquer objeto.
+			self._wa_follow_user()
+			if self._wa_lock:
+				# Trava ligada: SEMPRE a mesma resposta, para qualquer objeto.
 				return True
-			# O Leo escolheu o modo de navegação (NVDA+Espaço): respeita, e só
-			# entra em modo foco em campo de texto, como o NVDA faz.
-			return editable_and_available(obj)
+			if reason == OutputReason.CARET:
+				return super().shouldPassThrough(obj, reason)  # cursor do modo de navegação: nativo
+			if self._wa_relock(obj):
+				self._wa_lock = True
+				self._wa_escaped = False
+				return True
+			return False
 		return super().shouldPassThrough(obj, reason)
+
+	def script_disablePassThrough(self, gesture):
+		"""Esc: o nativo do NVDA. Só anota que o modo de navegação veio de um Esc."""
+		if self._wa_pinned and self.passThrough and not self.disableAutoPassThrough:
+			try:
+				focus = api.getFocusObject()
+				role = focus.role if focus is not None else None
+			except Exception:
+				role = None
+			if role not in self.IGNORE_DISABLE_PASS_THROUGH_WHEN_FOCUSED_ROLES:
+				self._wa_lock = False
+				self._wa_escaped = True
+				diag.act("esc-modo-navegacao", "buffer=WhatsApp")
+		super().script_disablePassThrough(gesture)
+
+	script_disablePassThrough.ignoreTreeInterceptorPassThrough = True
 
 	# ─── pontos onde o NVDA compara com ``reportPassThrough.last`` ──────────
 
