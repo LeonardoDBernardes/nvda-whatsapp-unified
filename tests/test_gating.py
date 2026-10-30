@@ -4,6 +4,7 @@ import config
 import pytest
 from controlTypes import Role
 from fakes import FakeApp, Gesture, Node, Page, focus
+from scriptHandler import script
 
 from globalPlugins.whatsAppUnified import GlobalPlugin, settings
 
@@ -78,35 +79,139 @@ def test_message_row_keys_only_on_message_rows():
 	assert page.msg_rows[0].getScript(Gesture("nvda+space")) is None
 
 
-def test_message_row_keys_fall_through_outside_whatsapp():
-	other = Page(url="https://www.example.com/")
-	row = other.msg_rows[0]
+class NativeBinding:
+	"""Uma classe NATIVA do NVDA com script na mesma tecla (Ctrl+C) que a linha usa."""
+
+	@script(description="nativo", gesture="kb:control+c")
+	def script_nativeCopy(self, gesture):
+		return "nativo"
+
+
+def row_with_native_binding(page):
 	from globalPlugins.whatsAppUnified import overlays
 
-	row.__class__ = type(type(row))("Forced", (overlays.MessageRow, type(row)), {})
-	focus(row)
-	assert row.getScript(Gesture("control+c")) is None
+	row = page.msg_rows[0]
+	row.__class__ = type(type(row))("ForcedRow", (overlays.MessageRow, NativeBinding, type(row)), {})
+	row.initOverlayClass()
+	return row
 
 
-def test_enter_alt_p_ctrl_s_only_when_the_message_has_a_player():
-	from controlTypes import Role
-	from fakes import Node
+def test_message_row_outside_its_scope_returns_what_nvda_would_return_without_the_addon():
+	"""Fora do escopo a linha devolve o script NATIVO da mesma tecla, nao None."""
+	page = Page()
+	row = row_with_native_binding(page)
+	config.conf[settings.CONFIG_SECTION]["scope"] = "desktop"  # o web saiu do escopo
+	script_found = row.getScript(Gesture("control+c"))
+	assert script_found is not None and script_found.__name__ == "script_nativeCopy"
+	config.conf[settings.CONFIG_SECTION]["scope"] = "both"
+	assert row.getScript(Gesture("control+c")).__name__ == "script_copyMessage"
 
+
+def test_message_row_gestures_are_not_bound_on_the_class():
+	"""Se estivessem ligados na classe, esconderiam o nativo mesmo devolvendo None."""
+	from globalPlugins.whatsAppUnified import overlays
+
+	for name in dir(overlays.MessageRow):
+		if name.startswith("script_"):
+			assert not getattr(getattr(overlays.MessageRow, name), "wa_gestures", ())
+
+
+class ExplodingNode(Node):
+	"""Qualquer caminhada pelos filhos falha: prova que a decisao da tecla nao anda pela arvore."""
+
+	@property
+	def firstChild(self):
+		raise AssertionError("caminhada pela arvore na decisao da tecla")
+
+	@property
+	def lastChild(self):
+		raise AssertionError("caminhada pela arvore na decisao da tecla")
+
+
+def test_message_row_get_script_never_walks_the_tree():
+	from globalPlugins.whatsAppUnified import overlays
+
+	page = Page()
+	row = ExplodingNode(Role.TABLEROW, "Fulano: oi", states=set())
+	page.msg_list.add(row)
+	row.__class__ = type(type(row))("ForcedRow", (overlays.MessageRow, type(row)), {})
+	row.initOverlayClass()
+	for key in ("enter", "alt+p", "control+s", "shift+enter", "control+shift+enter", "control+r", "alt+enter", "alt+c", "control+c"):
+		found = row.getScript(Gesture(key))
+		assert found is not None, key
+	assert row.getScript(Gesture("nvda+space")) is None
+
+
+def test_enter_alt_p_ctrl_s_decide_inside_the_script_and_pass_the_key_when_there_is_no_player():
 	page = Page().overlay_all()
 	row = page.msg_rows[0]
 	focus(row)
-	for key in ("enter", "alt+p", "control+s"):
-		assert row.getScript(Gesture(key)) is None, key  # sem player: a tecla e da pagina
+	for key, name in (("enter", "script_playMessage"), ("alt+p", "script_audioToggle"), ("control+s", "script_audioSpeed")):
+		gesture = Gesture(key)
+		found = row.getScript(gesture)
+		assert found.__name__ == name  # o script existe sempre
+		found(gesture)
+		assert gesture.sent == 1, key  # sem player: a tecla segue para a pagina
 	play = Node(Role.BUTTON, "Reproduzir mensagem de voz")
 	speed = Node(Role.BUTTON, "1x")
 	slider = Node(Role.SLIDER, "posicao")
 	for item in (speed, play, slider):
 		row.add(item)
-	for key in ("enter", "alt+p", "control+s"):
-		assert row.getScript(Gesture(key)) is not None, key
-	row.script_playMessage(Gesture("enter"))
-	assert play.actions == [0]
-	row.script_audioSpeed(Gesture("control+s"))
-	assert speed.actions == [0]
-	row.script_audioToggle(Gesture("alt+p"))
-	assert play.actions == [0, 0]
+	gesture = Gesture("enter")
+	row.getScript(gesture)(gesture)
+	assert play.actions == [0] and gesture.sent == 0
+	gesture = Gesture("control+s")
+	row.getScript(gesture)(gesture)
+	assert speed.actions == [0] and gesture.sent == 0
+	gesture = Gesture("alt+p")
+	row.getScript(gesture)(gesture)
+	assert play.actions == [0, 0] and gesture.sent == 0
+
+
+def test_ctrl_c_with_selected_text_goes_to_the_page():
+	import api
+
+	page = Page().overlay_all()
+	row = page.msg_rows[0]
+	focus(row)
+
+	class Info:
+		def __init__(self, collapsed):
+			self.isCollapsed = collapsed
+
+	row.makeTextInfo = lambda position: Info(False)
+	gesture = Gesture("control+c")
+	row.getScript(gesture)(gesture)
+	assert gesture.sent == 1 and api.clipboard == []
+	row.makeTextInfo = lambda position: Info(True)
+	gesture = Gesture("control+c")
+	row.getScript(gesture)(gesture)
+	assert gesture.sent == 0 and api.clipboard == ["Fulano: mensagem 0"]
+
+
+def test_ctrl_c_selection_in_the_tree_interceptor_also_counts():
+	import api
+
+	page = Page().overlay_all()
+	row = page.msg_rows[0]
+
+	class Info:
+		isCollapsed = False
+
+	class Holder:
+		def makeTextInfo(self, position):
+			return Info()
+
+	row.treeInterceptor = Holder()
+	gesture = Gesture("control+c")
+	row.getScript(gesture)(gesture)
+	assert gesture.sent == 1 and api.clipboard == []
+
+
+def test_global_plugin_binds_only_its_own_documented_keys():
+	"""O mapa do plugin so tem os nossos comandos (conferido no fonte: quem devolve None e ignorado)."""
+	bound = set()
+	for name in dir(GlobalPlugin):
+		if name.startswith("script_"):
+			bound.update(getattr(getattr(GlobalPlugin, name), "wa_gestures", ()))
+	assert bound == {"kb:alt+1", "kb:alt+2", "kb:alt+d", "kb:shift+alt+c", "kb:control+shift+e", "kb:nvda+shift+h"}

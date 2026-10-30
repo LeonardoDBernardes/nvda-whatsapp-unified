@@ -8,6 +8,7 @@ própria linha da mensagem, em vez de pelos "irmãos" do foco.
 """
 
 import re
+import time
 
 import controlTypes
 import core
@@ -16,6 +17,7 @@ from .tree import (
 	Role,
 	is_chat_list_container,
 	iter_children,
+	new_deadline,
 	safe_name,
 	safe_role,
 	safe_states,
@@ -48,15 +50,17 @@ EXPAND_DELAY_MS = 60
 EXPAND_MAX_TRIES = 20
 
 TEXT_BUDGET = 400
+TEXT_SECONDS = 0.1  # coleta de texto (roda também a cada 60 ms na espera do "ler mais")
 
 
-def collect_texts(obj, min_length=2, budget=TEXT_BUDGET):
+def collect_texts(obj, min_length=2, budget=TEXT_BUDGET, seconds=TEXT_SECONDS):
 	"""Textos (STATICTEXT) da mensagem, na ordem da tela (profundidade primeiro)."""
 	texts = []
 	counter = [0]
+	limit = time.monotonic() + seconds
 
 	def visit(node):
-		if counter[0] >= budget:
+		if counter[0] >= budget or time.monotonic() > limit:
 			return
 		counter[0] += 1
 		try:
@@ -93,17 +97,17 @@ def is_truncated(row):
 	return bool(READ_MORE_SUFFIX_RE.search(name)) or find_read_more(row) is not None
 
 
-def find_buttons(root, predicate=None, budget=TEXT_BUDGET, first=False):
+def find_buttons(root, predicate=None, budget=TEXT_BUDGET, first=False, deadline=None):
 	def is_button(obj):
 		if safe_role(obj) != Role.BUTTON:
 			return False
 		return predicate is None or predicate(obj)
 
-	return walk(root, is_button, budget=budget, seconds=1.0, first=first)
+	return walk(root, is_button, budget=budget, first=first, deadline=deadline)
 
 
-def find_read_more(row):
-	return find_buttons(row, lambda b: bool(READ_MORE_RE.match(safe_name(b))), first=True)
+def find_read_more(row, deadline=None):
+	return find_buttons(row, lambda b: bool(READ_MORE_RE.match(safe_name(b))), first=True, deadline=deadline)
 
 
 def expand_then(row, callback):
@@ -140,14 +144,15 @@ def expand_then(row, callback):
 
 # ─── Player de áudio e vídeo ────────────────────────────────────────────────
 
-def _buttons_before(row, stop):
+def _buttons_before(row, stop, deadline=None):
 	"""Botões da linha, em ordem de leitura, até chegar em ``stop``."""
 	buttons = []
 	counter = [0]
 	done = [False]
+	limit = deadline if deadline is not None else new_deadline()
 
 	def visit(node):
-		if done[0] or counter[0] >= TEXT_BUDGET:
+		if done[0] or counter[0] >= TEXT_BUDGET or time.monotonic() > limit:
 			return
 		counter[0] += 1
 		if node == stop:
@@ -164,33 +169,39 @@ def _buttons_before(row, stop):
 	return buttons
 
 
-def find_player(row):
+def find_player(row, deadline=None):
 	"""(botões antes da barra de posição, barra de posição) do áudio da mensagem.
 
 	Não usa nome de classe do site. Sem barra de posição: ([], None).
 	"""
+	if deadline is None:
+		deadline = new_deadline()
 	slider = walk(
 		row,
 		lambda o: safe_role(o) in (Role.SLIDER, Role.PROGRESSBAR),
 		budget=TEXT_BUDGET,
-		seconds=1.0,
+		deadline=deadline,
 	)
 	if slider is None:
 		return [], None
-	return _buttons_before(row, slider), slider
+	return _buttons_before(row, slider, deadline), slider
 
 
-def find_video_button(row):
+def find_video_button(row, deadline=None):
 	"""Botão de reproduzir de um vídeo (o rótulo tem a duração, como 0:45)."""
-	return find_buttons(row, lambda b: bool(DURATION_RE.search(safe_name(b))), first=True)
+	return find_buttons(row, lambda b: bool(DURATION_RE.search(safe_name(b))), first=True, deadline=deadline)
 
 
 def play_target(row):
-	"""Botão que toca/pausa a mensagem, ou None se ela não tem player."""
-	buttons, slider = find_player(row)
+	"""Botão que toca/pausa a mensagem, ou None se ela não tem player.
+
+	Os dois passos dividem o mesmo prazo do comando.
+	"""
+	deadline = new_deadline()
+	buttons, slider = find_player(row, deadline)
 	if slider is not None and buttons:
 		return buttons[-1]
-	return find_video_button(row)
+	return find_video_button(row, deadline)
 
 
 def speed_target(row):
@@ -224,10 +235,10 @@ def react_button(row):
 	return find_buttons(row, lambda b: bool(REACT_BUTTON_RE.search(safe_name(b))), first=True)
 
 
-def call_button(root):
+def call_button(root, deadline=None):
 	"""Botão de chamada do cabeçalho da conversa (fora da lista de conversas)."""
 
 	def is_call(obj):
 		return safe_role(obj) == Role.BUTTON and bool(CALL_BUTTON_RE.search(safe_name(obj)))
 
-	return walk(root, is_call, skip=is_chat_list_container)
+	return walk(root, is_call, skip=is_chat_list_container, deadline=deadline)

@@ -1,4 +1,4 @@
-"""Deteccao de contexto: endereco, titulo, outro site, identificador UIA."""
+"""Deteccao de contexto: so o endereco web.whatsapp.com decide; titulo nao conta."""
 
 import pytest
 from fakes import FakeApp, Node, Page, focus
@@ -13,7 +13,10 @@ from globalPlugins.whatsAppUnified import context
 		("https://web.whatsapp.com/", True),
 		("https://web.whatsapp.com/send?phone=1", True),
 		("web.whatsapp.com", True),
-		("https://whatsapp.com/", True),
+		("https://whatsapp.com/", False),  # site institucional
+		("https://faq.whatsapp.com/", False),
+		("https://www.whatsapp.com/download", False),
+		("https://api.whatsapp.com/send?phone=1", False),
 		("https://www.example.com/", False),
 		("https://whatsapp.com.evil.example/", False),
 		("https://evilwhatsapp.com/", False),
@@ -42,11 +45,18 @@ def test_other_site_is_no_context_even_with_whatsapp_in_the_title():
 	assert context.wa_context(page.composer) is None
 
 
-def test_uia_identifier_falls_back_to_window_title():
+def test_uia_identifier_never_falls_back_to_the_window_title():
+	"""Sem endereco utilizavel NAO se adivinha pelo titulo (isso disparava varreduras)."""
 	page = Page(url="uia:AutomationId-7", title="(3) WhatsApp - Microsoft Edge")
-	assert context.raw_context(page.msg_rows[0]) == "web"
-	other = Page(url="uia:AutomationId-7", title="Notícias - Microsoft Edge")
-	assert context.raw_context(other.msg_rows[0]) is None
+	assert context.raw_context(page.msg_rows[0]) is None
+	assert context.wa_context(page.composer) is None
+
+
+def test_institutional_and_faq_pages_are_no_context():
+	for url in ("https://faq.whatsapp.com/", "https://www.whatsapp.com/", "https://whatsapp.com/"):
+		page = Page(url=url)
+		assert context.raw_context(page.msg_rows[0]) is None, url
+		assert context.wa_context(page.composer) is None, url
 
 
 def test_desktop_app_module_is_app_context():
@@ -96,15 +106,80 @@ def test_in_whatsapp_foreground_follows_the_focus():
 	assert context.in_whatsapp_foreground() is False
 
 
-def test_is_web_document_checks_url_first_then_title():
+def test_is_web_document_checks_the_url_only():
 	page = Page()
 	assert context.is_web_document(page.doc) is True
 	other = Page(url="https://www.example.com/", title="WhatsApp - Chrome")
 	assert context.is_web_document(other.doc) is False
 	no_url = Page(url=None, title="WhatsApp - Chrome")
-	assert context.is_web_document(no_url.doc) is True
+	assert context.is_web_document(no_url.doc) is False
+	faq = Page(url="https://faq.whatsapp.com/")
+	assert context.is_web_document(faq.doc) is False
 	not_browser = Page(app_name="notepad")
 	assert context.is_web_document(not_browser.doc) is False
+
+
+def test_title_or_unconfirmed_page_never_triggers_a_scan():
+	"""Aba chamada 'WhatsApp' sem endereco confirmado: nenhuma caminhada pela arvore."""
+	from globalPlugins.whatsAppUnified import overlays
+	from fakes import apply_overlays
+
+	page = Page(url="https://www.example.com/", title="WhatsApp - Google Chrome")
+	row = page.msg_rows[0]
+	touched = []
+	original = context.classify_container
+	context.classify_container = lambda container: touched.append(container) or original(container)
+	try:
+		apply_overlays(row, {"web"})
+		apply_overlays(page.chat_rows[0], {"web"})
+	finally:
+		context.classify_container = original
+	assert touched == []
+	assert not isinstance(row, overlays.MessageRow)
+
+
+def test_find_document_of_the_focus_uses_the_focus_ancestors_without_climbing(monkeypatch):
+	import api
+
+	page = Page()
+	deep = page.msg_rows[0].lastChild
+	api.setFocusObject(deep, ancestors=[page.doc, page.main, page.msg_list, page.msg_rows[0]])
+
+	def boom(*args, **kwargs):
+		raise AssertionError("subiu pelos pais do foco")
+
+	monkeypatch.setattr(context, "ancestors", boom)
+	assert context.find_document(deep) is page.doc
+
+
+def test_find_document_of_other_objects_climbs_only_a_few_parents():
+	page = Page()
+	node = page.doc
+	for _ in range(10):
+		node = node.add(Node(Role.SECTION, "n"))
+	assert context.find_document(node) is None  # fundo demais: nao varre a arvore toda
+	assert context.find_document(page.msg_rows[0].lastChild) is page.doc
+
+
+def test_verdict_is_cached_per_window_and_refreshes_when_the_address_changes():
+	page = Page()
+	assert context.raw_context(page.msg_rows[0]) == "web"
+	page.doc.IAccessibleObject.url = "https://www.example.com/"
+	assert context.raw_context(page.msg_rows[1]) == "web"  # ainda dentro da validade curta
+	context.forget_web()
+	assert context.raw_context(page.msg_rows[1]) is None
+
+
+def test_tree_interceptor_verdict_follows_the_document_address():
+	from globalPlugins.whatsAppUnified.webmode import WhatsAppChromeVBuf
+
+	page = Page()
+	ti = WhatsAppChromeVBuf(page.doc)
+	assert context.ti_verdict(ti) is True
+	page.doc.IAccessibleObject.url = "https://faq.whatsapp.com/"
+	assert context.ti_verdict(ti) is False
+	page.doc.IAccessibleObject.url = "https://web.whatsapp.com/"
+	assert context.ti_verdict(ti) is True
 
 
 def test_row_kind_chat_message_other():

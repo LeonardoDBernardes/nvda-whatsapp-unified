@@ -2,7 +2,7 @@
 
 NVDA add-on for **WhatsApp Desktop** (the Microsoft Store app, which uses WebView2) and for **WhatsApp Web** (Chrome, Edge, Brave and other Chromium-based browsers).
 
-- Tested on NVDA 2026.2. Works from NVDA 2025.1 on.
+- Tested on NVDA 2026.2. Works from NVDA 2026.1 on.
 - GPL-2 license (`COPYING` file).
 - The shortcuts only apply while focus is in WhatsApp. In any other program, or on any other website, every key is left untouched for NVDA and for the program.
 
@@ -23,7 +23,7 @@ NVDA add-on for **WhatsApp Desktop** (the Microsoft Store app, which uses WebVie
 |---|---|
 | Alt+1 | Go to the chat list (to the selected chat; if none, to the first one). |
 | Alt+2 | Go to the message list (to the last message). |
-| Alt+D | Go to the composer. |
+| Alt+D | Go to the composer. **In Chrome and Edge, while focus is in WhatsApp Web, this key replaces the browser's "go to address bar"**; use Ctrl+L, which keeps working. In any other site or program, Alt+D belongs to the browser. |
 | Shift+Alt+C | Open the call menu (the call button in the chat header). If it is not found, says "Call button not found". |
 | Ctrl+Shift+E | Turn the phone number filter in messages on or off. |
 | NVDA+Shift+H | Turn the usage hints filter on or off. |
@@ -41,7 +41,7 @@ NVDA add-on for **WhatsApp Desktop** (the Microsoft Store app, which uses WebVie
 | Ctrl+R | Reads the full message. If the text is cut ("... Read more"), it clicks "Read more", waits for the text to grow (checks every 60 ms, up to about 1.3 s) and speaks it. |
 | Alt+Enter | The same, but opens the text in an NVDA browseable window (titled "Message"). |
 | Alt+C | The same, but opens the text in a plain text window. |
-| Ctrl+C | Copies the message text and says "Copied". With no text, the key goes to WhatsApp. |
+| Ctrl+C | Copies the message text and says "Copied". With no text, **or if you selected a piece of text**, the key goes to WhatsApp. |
 
 No other key is taken. In particular, **NVDA+Space** and **Esc** remain NVDA's and WhatsApp's own (see the focus mode section).
 
@@ -54,10 +54,10 @@ NVDA → Preferences → Settings → **WhatsApp Unified**. They take effect imm
 | Option | Default | What it does |
 |---|---|---|
 | Apply to | Both | App only (Desktop), WhatsApp Web only (browser), or both. |
-| Filter phone numbers in messages | Yes | Removes phone numbers ("+55 11 91234-5678") from the speech of messages. |
+| Filter phone numbers in messages | Yes | Removes from speech the phone number that appears as the message **sender** ("+55 11 91234-5678: text"). The message body is never changed. |
 | Filter phone numbers in the chat list | No | The same in the chat list. |
-| Silence usage hints | Yes | Cuts phrases such as "For more options, press the arrow...". |
-| Remove "Maybe" before contact names | Yes | "Maybe John" becomes "John". |
+| Silence usage hints | Yes | Cuts only complete known sentences, such as "For more options, press the arrow...", at the end of a chat name. Never touches message text, what you type or the text field. |
+| Remove "Maybe" before contact names | Yes | "Maybe John" becomes "John", only in the chat name or the message sender. Never inside a message's text. |
 | Keep focus mode automatically on WhatsApp Web, with no mode switch sound | Yes | Turns on the part described in the next section. |
 | Recover focus when WhatsApp loses it | Yes | Turns on focus recovery. |
 
@@ -76,11 +76,12 @@ On WhatsApp Web, NVDA played the "focus mode" / "browse mode" sound at every foc
 
 ### What the add-on does
 
-A buffer class of its own (`WhatsAppChromeVBuf`, derived from the Chromium one) is used **only in documents whose address is on whatsapp.com**:
+A buffer class of its own (`WhatsAppChromeVBuf`, derived from the Chromium one) is used **only in documents whose address is `web.whatsapp.com`** (help pages such as `faq.whatsapp.com` and the corporate site are not affected). The window title is never used to decide: with no confirmed address the add-on does nothing:
 
 1. It is **born in focus mode** and pins that mode. For any WhatsApp object it always gives the same answer. With no varying answer there is no mode switch, so no sound.
 2. It syncs NVDA's global variable at birth, when it gets focus and at every focus. Entering WhatsApp from another tab is also **silent** (zero sounds).
-3. NVDA itself uses the same mechanism in Internet Explorer (MSHTML) and Excel.
+3. **Navigating to another site in the same tab releases the pin** (silently), and going back to WhatsApp pins it again. Turning off the "Keep focus mode automatically..." option takes effect at once, without reloading the page.
+4. NVDA itself uses the same mechanism in Internet Explorer (MSHTML) and Excel.
 
 ### What stays native
 
@@ -98,7 +99,7 @@ A buffer class of its own (`WhatsAppChromeVBuf`, derived from the Chromium one) 
 WhatsApp mounts and unmounts rows as you scroll (the lists are virtualized). When the focused row is unmounted, focus falls to the list container, the page body or the document, and the screen reader says something like "grid", "document" or nothing.
 
 1. The add-on remembers the last chat or message that had focus.
-2. If focus falls to one of those places and **you did not press** a key that takes focus away on purpose (Esc, Tab, Enter, F6, Windows), it does **not** speak the container right away. It waits 200 ms.
+2. If focus falls to one of those places and **you did not press** a key that takes focus away on purpose (Esc, Tab, Enter, F6, Windows), it does **not** speak the container right away. It waits 200 ms. A recent **mouse click** (or a pressed button) also counts as legitimate movement: in that case the add-on recovers nothing and the focus is spoken normally.
 3. If focus is still there, it returns focus to the remembered row. If that row was unmounted, it uses the selected row of the same list, then the closest one by position, then the first. NVDA speaks the row normally.
 4. If it finds nothing, it speaks the original focus. At most **one recovery per second**: it never loops.
 
@@ -147,7 +148,7 @@ Workaround, still to be tested on your computer: NVDA → Preferences → Settin
 
 1. Check that the "Keep focus mode automatically..." option is on and the scope includes the Web.
 2. Check that the UIA option for Chromium is on "Default" (above).
-3. Check the address: it only applies to `*.whatsapp.com`.
+3. Check the address: it only applies to `web.whatsapp.com`.
 4. If you pressed NVDA+Space on purpose, the sound is NVDA's and is expected.
 
 ### An add-on key does nothing
@@ -160,7 +161,7 @@ That is WhatsApp: it strips message names until you use the keyboard again. The 
 
 ### Focus recovery gets in the way
 
-Turn off "Recover focus when WhatsApp loses it". It never acts right after Esc, Tab, Enter, F6 or Windows, and at most once per second.
+Turn off "Recover focus when WhatsApp loses it". It never acts right after Esc, Tab, Enter, F6, Windows or a mouse click, and at most once per second.
 
 ### My old `nvda.ini`
 

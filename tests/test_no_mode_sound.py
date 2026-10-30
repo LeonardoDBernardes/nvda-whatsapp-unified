@@ -9,7 +9,7 @@ com a classe fixa ``WhatsAppChromeVBuf`` ele nunca toca e ``passThrough`` nunca 
 import browseMode
 import config
 import pytest
-from controlTypes import Role, State
+from controlTypes import OutputReason, Role, State
 from fakes import Gesture, Node, Page, apply_overlays, focus
 from NVDAObjects.IAccessible import chromium
 from NVDAObjects.IAccessible.chromium import ChromeVBuf
@@ -209,26 +209,83 @@ def test_old_disable_focus_lock_switch_is_honored():
 	assert ti.passThrough is False
 
 
-def test_document_without_url_uses_window_title_and_pins_silently():
+def test_old_disable_focus_lock_stored_as_text_false_does_not_disable_the_mode():
+	"""O ConfigObj devolve a chave antiga SEM especificacao como texto: 'False' nao e verdadeiro."""
+	config.conf[settings.CONFIG_SECTION]["disableFocusLock"] = "False"
+	page = Page()
+	ti = WhatsAppChromeVBuf(page.doc)
+	assert ti.passThrough is True and ti.disableAutoPassThrough is True
+
+
+def test_document_without_a_confirmed_address_is_not_taken_for_whatsapp_by_title():
 	page = Page(url=None, title="(1) WhatsApp - Google Chrome")
+	doc = page.doc
+	apply_overlays(doc, {"web"})
+	assert not isinstance(doc, WhatsAppWebDocument)
+	assert doc.treeInterceptorClass is ChromeVBuf
+
+
+def test_faq_and_institutional_pages_keep_the_native_buffer():
+	for url in ("https://faq.whatsapp.com/", "https://www.whatsapp.com/", "https://whatsapp.com/"):
+		page = Page(url=url)
+		apply_overlays(page.doc, {"web"})
+		assert not isinstance(page.doc, WhatsAppWebDocument), url
+		assert page.doc.treeInterceptorClass is ChromeVBuf, url
+
+
+def test_navigating_the_same_buffer_to_another_site_releases_the_pinned_mode_silently():
+	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
-	assert ti.passThrough is True
-	browseMode.reportPassThrough.last = False
 	enter(ti, page)
-	run_sequence(ti, page)
-	assert browseMode.sounds == []
+	assert ti.passThrough is True and ti.disableAutoPassThrough is True
+	browseMode.sounds.clear()
+	page.doc.IAccessibleObject.url = "https://www.example.com/"  # SPA/navegacao no mesmo buffer
+	ti.event_gainFocus(page.msg_rows[0], lambda: None)
+	assert ti.disableAutoPassThrough is False
+	assert ti.passThrough is False  # volta a regra nativa (linha = navegacao)
+	assert browseMode.sounds == []  # a soltura em si e silenciosa
+	ti.event_gainFocus(page.composer, lambda: None)
+	assert ti.passThrough is True  # nativo: campo editavel
 
 
-def test_url_arriving_after_creation_pins_without_sound():
-	"""about:blank no nascimento; o endereco do WhatsApp chega depois."""
-	page = Page(url="about:blank", title="Nova guia - Google Chrome")
+def test_navigating_back_to_whatsapp_pins_again():
+	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
-	assert ti.passThrough is False
+	page.doc.IAccessibleObject.url = "https://www.example.com/"
+	ti.event_gainFocus(page.msg_rows[0], lambda: None)
+	assert ti.disableAutoPassThrough is False
 	page.doc.IAccessibleObject.url = "https://web.whatsapp.com/"
-	browseMode.reportPassThrough.last = False
-	ti.event_gainFocus(page.chat_rows[0], lambda: None)
-	assert ti.passThrough is True
+	browseMode.sounds.clear()
+	ti.event_gainFocus(page.msg_rows[0], lambda: None)
+	assert ti.passThrough is True and ti.disableAutoPassThrough is True
 	assert browseMode.sounds == []
+
+
+def test_turning_the_option_off_takes_effect_without_reloading_the_page():
+	page = Page()
+	ti = WhatsAppChromeVBuf(page.doc)
+	enter(ti, page)
+	assert ti.passThrough is True
+	config.conf[settings.CONFIG_SECTION]["autoFocusMode"] = False
+	ti.event_gainFocus(page.msg_rows[0], lambda: None)
+	assert ti.disableAutoPassThrough is False and ti.passThrough is False
+	assert ti.shouldPassThrough(page.msg_rows[1], OutputReason.FOCUS) is False  # nativo
+	config.conf[settings.CONFIG_SECTION]["autoFocusMode"] = True
+	browseMode.sounds.clear()
+	ti.event_gainFocus(page.msg_rows[1], lambda: None)
+	assert ti.passThrough is True and browseMode.sounds == []
+
+
+def test_unpinning_while_the_composer_is_focused_keeps_focus_mode():
+	"""Desligar a opcao com o foco no campo de digitacao nao pode jogar o Leo em modo navegacao."""
+	page = Page()
+	ti = WhatsAppChromeVBuf(page.doc)
+	enter(ti, page)
+	focus(page.composer)
+	config.conf[settings.CONFIG_SECTION]["autoFocusMode"] = False
+	ti.shouldPassThrough(page.composer, OutputReason.FOCUS)  # so a decisao, sem o evento
+	assert ti.passThrough is True  # a regra nativa de campo editavel foi aplicada ao soltar
+	assert ti.disableAutoPassThrough is False
 
 
 def test_event_gain_focus_is_delivered_even_while_loading():

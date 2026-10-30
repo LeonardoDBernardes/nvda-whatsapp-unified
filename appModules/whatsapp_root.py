@@ -21,11 +21,27 @@ try:
 except Exception:
 	_BaseAppModule = appModuleHandler.AppModule
 
-try:
-	from globalPlugins.whatsAppUnified import overlays
-except Exception:
-	log.error("WhatsApp Unificado: não foi possível carregar o pacote do plugin global", exc_info=True)
-	overlays = None
+
+_load_failed = False
+
+
+def _overlays():
+	"""O módulo de sobreposições do pacote, importado NO MOMENTO DA CHAMADA.
+
+	Importar no topo deixaria este módulo com uma cópia velha do pacote depois
+	de NVDA+Ctrl+F3 (a recarga apaga ``globalPlugins*`` de ``sys.modules`` e
+	reimporta; o módulo do aplicativo continuaria usando o antigo).
+	"""
+	global _load_failed
+	try:
+		from globalPlugins.whatsAppUnified import overlays
+
+		return overlays
+	except Exception:
+		if not _load_failed:  # uma vez só: isto roda para todo objeto
+			_load_failed = True
+			log.error("WhatsApp Unificado: não foi possível carregar o pacote do plugin global", exc_info=True)
+		return None
 
 
 class AppModule(_BaseAppModule):
@@ -35,5 +51,6 @@ class AppModule(_BaseAppModule):
 
 	def chooseNVDAObjectOverlayClasses(self, obj, clsList):
 		super().chooseNVDAObjectOverlayClasses(obj, clsList)
+		overlays = _overlays()
 		if overlays is not None:
 			overlays.choose_overlay_classes(obj, clsList, {"app"})

@@ -27,11 +27,13 @@ import time
 import api
 import core
 import inputCore
+import mouseHandler
 import speech
+import winUser
 from controlTypes import OutputReason
 
 from . import settings
-from .context import wa_context
+from .context import raw_context, wa_context
 from .tree import (
 	LIST_ROLES,
 	Role,
@@ -42,6 +44,7 @@ from .tree import (
 	ancestors,
 	is_defunct,
 	document_root,
+	new_deadline,
 	rows_of,
 	safe_name,
 	safe_role,
@@ -53,6 +56,7 @@ CHECK_DELAY_MS = 200
 MIN_INTERVAL_S = 1.0  # no máximo uma recuperação por segundo
 LEGIT_KEY_WINDOW_S = 0.6  # tecla que tira o foco de propósito, de pouco antes
 REMEMBER_FRESH_S = 2.0  # "a linha foi o foco há pouco"
+MOUSE_WINDOW_S = 0.6  # clique ou movimento de mouse de pouco antes também é intencional
 
 # Teclas virtuais que movem o foco de propósito (Esc, Tab, Enter, F6, Windows).
 LEGIT_KEYS = frozenset((0x1B, 0x09, 0x0D, 0x75, 0x5B, 0x5C))
@@ -97,6 +101,25 @@ def on_raw_key(vkCode=0, scanCode=0, extended=False, pressed=True, **kwargs):
 def legit_key_recent(at=None):
 	at = now() if at is None else at
 	return _State.last_key in LEGIT_KEYS and (at - _State.last_key_at) <= LEGIT_KEY_WINDOW_S
+
+
+def mouse_recent(at=None):
+	"""Houve clique de mouse agora ou evento de mouse há pouco? (movimento legítimo de foco)
+
+	Um clique pode mover o foco para um contêiner de propósito; recuperar a
+	linha lembrada brigaria com o usuário. O NVDA anota o instante do último
+	evento de mouse; o estado dos botões cobre o clique ainda apertado.
+	"""
+	try:
+		for button in (winUser.VK_LBUTTON, winUser.VK_RBUTTON, winUser.VK_MBUTTON):
+			if winUser.getAsyncKeyState(button) & 0x8000:
+				return True
+	except Exception:
+		pass
+	try:
+		return (time.time() - mouseHandler.lastMouseEventTime) <= MOUSE_WINDOW_S
+	except Exception:
+		return False
 
 
 def register_keys():
@@ -174,7 +197,7 @@ def should_defer(obj, at=None):
 		return False
 	if at - _State.last_recovery_at < MIN_INTERVAL_S:
 		return False
-	if legit_key_recent(at):
+	if legit_key_recent(at) or mouse_recent():
 		return False
 	kind = landing_kind(obj)
 	if kind is None:
@@ -196,10 +219,16 @@ def _list_container_for(obj, kind):
 	"""O contêiner da lista do tipo ``kind`` (a partir do objeto onde o foco caiu)."""
 	if landing_kind(obj) == kind:
 		return obj
-	root = obj if safe_role(obj) == Role.DOCUMENT else document_root(obj)
+	if safe_role(obj) == Role.DOCUMENT:
+		root = obj
+	else:
+		# Só o aplicativo aceita a janela inteira como reserva; no navegador
+		# isso seria varrer o Chrome todo.
+		root = document_root(obj, allow_foreground=raw_context(obj) == "app")
+	deadline = new_deadline()
 	if kind == "chat":
-		return find_chat_list(root)
-	return find_message_list(root)
+		return find_chat_list(root, deadline)
+	return find_message_list(root, deadline)
 
 
 def pick_target(obj):
@@ -258,7 +287,7 @@ def check_focus(obj):
 		if api.getFocusObject() != obj:
 			return  # o foco já foi para outro lugar e falou sozinho
 		at = now()
-		if at - _State.last_recovery_at < MIN_INTERVAL_S:
+		if at - _State.last_recovery_at < MIN_INTERVAL_S or mouse_recent():
 			speech.speakObject(obj, reason=OutputReason.FOCUS)
 			return
 		target = pick_target(obj)

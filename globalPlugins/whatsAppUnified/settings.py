@@ -4,7 +4,7 @@
 As opções são lidas da configuração do NVDA a cada uso, então mudar algo no
 painel vale na hora, sem reiniciar o NVDA. Chaves antigas (por exemplo
 ``disableFocusLock``) são toleradas: o NVDA as mantém no arquivo e este módulo
-só as consulta quando faz sentido.
+só as consulta quando faz sentido. Todo booleano passa por ``as_bool``.
 """
 
 import addonHandler
@@ -16,6 +16,7 @@ from gui.settingsDialogs import NVDASettingsDialog, SettingsPanel
 addonHandler.initTranslation()
 
 CONFIG_SECTION = "whatsAppUnified"
+LEGACY_KEY = "disableFocusLock"  # chave da 1.x: só lida, nunca regravada
 
 SPEC = {
 	"scope": "string(default='both')",  # 'desktop', 'web' ou 'both'
@@ -51,6 +52,21 @@ def register_config():
 		config.conf[CONFIG_SECTION] = {}
 
 
+_TRUE_WORDS = ("true", "1", "yes", "on")
+
+
+def as_bool(value):
+	"""Interpreta um valor de configuração como booleano.
+
+	Chaves SEM especificação (por exemplo a ``disableFocusLock`` da 1.x) voltam
+	do ConfigObj como TEXTO: ``'False'`` é um texto não vazio, portanto
+	verdadeiro em Python. Todo valor booleano lido passa por aqui.
+	"""
+	if isinstance(value, bool):
+		return value
+	return str(value).strip().lower() in _TRUE_WORDS
+
+
 def get(key):
 	"""Valor atual de uma opção (ao vivo). Nunca levanta exceção."""
 	default = DEFAULTS.get(key)
@@ -59,13 +75,15 @@ def get(key):
 		value = section[key] if key in section else default
 	except Exception:
 		return default
-	if key == "autoFocusMode":
-		# Migração: 'disableFocusLock' (1.x) desligava o modo foco automático.
-		try:
-			if section.get("disableFocusLock", False):
-				return False
-		except Exception:
-			pass
+	if isinstance(default, bool):
+		value = as_bool(value)
+		if key == "autoFocusMode" and value:
+			# Migração: 'disableFocusLock' (1.x) desligava o modo foco automático.
+			try:
+				if LEGACY_KEY in section and as_bool(section[LEGACY_KEY]):
+					return False
+			except Exception:
+				pass
 	return value
 
 
@@ -139,9 +157,13 @@ class WhatsAppUnifiedSettings(SettingsPanel):
 		section["filterTalvez"] = self.filterTalvez.IsChecked()
 		section["autoFocusMode"] = self.autoFocusMode.IsChecked()
 		section["focusRecovery"] = self.focusRecovery.IsChecked()
-		# O interruptor antigo deixa de valer quando o usuário salva o painel novo.
-		if "disableFocusLock" in section:
-			section["disableFocusLock"] = False
+		# O interruptor antigo deixa de valer quando o usuário salva o painel novo:
+		# a chave é APAGADA (regravar False deixaria um texto 'False' no arquivo).
+		try:
+			if LEGACY_KEY in section:
+				del section[LEGACY_KEY]
+		except Exception:
+			pass
 		config.conf.save()
 
 

@@ -45,5 +45,8 @@ def clean_state():
 	config.conf[settings.CONFIG_SECTION].update(settings.DEFAULTS)
 	recovery.reset()
 	context.forget_kinds()
-	context._web_cache.clear()
+	context.forget_web()
+	import mouseHandler
+
+	mouseHandler.lastMouseEventTime = 0
 	yield

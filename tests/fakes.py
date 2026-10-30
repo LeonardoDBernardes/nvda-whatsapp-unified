@@ -9,6 +9,7 @@ from controlTypes import Role, State
 from NVDAObjects.IAccessible import IAccessible, chromium
 
 _ids = itertools.count(1)
+_hwnds = itertools.count(1000)
 
 
 class FakeApp:
@@ -52,9 +53,15 @@ class Node(IAccessible):
 		for child in children:
 			self.add(child)
 
+	def _set_hwnd(self, hwnd):
+		self.windowHandle = hwnd
+		for child in self._children:
+			child._set_hwnd(hwnd)
+
 	def add(self, child):
 		child.parent = self
 		self._children.append(child)
+		child._set_hwnd(self.windowHandle)  # uma pagina = uma janela (cada aba tem a sua)
 		return child
 
 	def remove(self, child):
@@ -119,7 +126,10 @@ class DocNode(Node, chromium.Document):
 
 class Gesture:
 	def __init__(self, ident):
+		from inputCore import normalizeGestureIdentifier
+
 		self.identifiers = ("kb:" + ident.lower(),)
+		self.normalizedIdentifiers = (normalizeGestureIdentifier("kb:" + ident),)
 		self.sent = 0
 
 	def send(self):
@@ -160,10 +170,11 @@ class Page:
 	def __init__(self, url="https://web.whatsapp.com/", app_name="chrome", chats=3, messages=3, title=None):
 		if title is None:
 			title = "(2) WhatsApp - Google Chrome" if "whatsapp" in str(url) else "Exemplo - Google Chrome"
-		winUser.setTitle(100, title)
+		hwnd = next(_hwnds)
+		winUser.setTitle(hwnd, title)
 		winUser.setTitle(1, title)
 		self.app = FakeApp(app_name)
-		self.doc = DocNode(url, app=self.app)
+		self.doc = DocNode(url, app=self.app, hwnd=hwnd)
 		self.chat_rows = [chat_row("Conversa %d" % i, selected=(i == 1)) for i in range(chats)]
 		self.chat_list = Node(Role.TABLE, "Lista de conversas", states={State.FOCUSABLE}, children=self.chat_rows)
 		side = Node(Role.SECTION, "", children=[self.chat_list])

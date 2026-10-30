@@ -19,41 +19,80 @@ def option(key, value):
 
 # ─── filtros ────────────────────────────────────────────────────────────────
 
-def test_phone_filter_per_list():
+HINT = "Para mais opções, pressione a seta para a direita."
+
+
+def test_phone_in_chat_list_names_only_when_the_option_is_on():
 	text = "Maria %s enviou foto" % PHONE
-	assert PHONE not in filters.filter_text(text, "message")  # padrao: ligado nas mensagens
 	assert filters.filter_text(text, "chat") == text  # padrao: desligado na lista de conversas
 	option("filterChatList", True)
 	assert PHONE not in filters.filter_text(text, "chat")
+
+
+def test_phone_in_messages_only_as_the_sender_prefix():
+	assert filters.filter_text("%s: oi, tudo bem?" % PHONE, "message") == "oi, tudo bem?"
+	body = "Maria: ligue para %s amanhã" % PHONE
+	assert filters.filter_text(body, "message") == body  # no corpo: nunca
+	assert filters.filter_text("Maria: %s" % PHONE, "message") == "Maria: %s" % PHONE
 	option("filterMessageList", False)
-	assert filters.filter_text(text, "message") == text
-	assert filters.filter_text(text, None) == text  # fora de lista nunca filtra telefone
+	assert filters.filter_text("%s: oi" % PHONE, "message") == "%s: oi" % PHONE
 
 
-def test_phone_filter_collapses_spaces():
-	assert filters.filter_text("Ligou %s ontem" % PHONE, "message") == "Ligou ontem"
+def test_phone_inside_a_message_body_keeps_its_meaning():
+	body = "Anote: o código é %s e vale hoje" % PHONE
+	assert filters.filter_text(body, "message") == body
 
 
-def test_usage_hints_are_cut_but_normal_sentences_stay():
-	hint = "Maria disse oi. Para mais opções, pressione a seta para a direita"
-	assert filters.filter_text(hint, "message") == "Maria disse oi."
-	assert filters.filter_text(hint, None) == "Maria disse oi."
-	normal = "Para mais opções de pagamento ligue amanhã"  # sem palavra de dica (seta/menu...)
-	assert filters.filter_text(normal, "message") == normal
+def test_unknown_kind_is_never_touched():
+	text = "Talvez Ana %s. %s" % (PHONE, HINT)
+	assert filters.filter_text(text, None) == text
+	assert filters.filter_text(text, "button") == text
+
+
+def test_usage_hint_item_alone_is_dropped_but_ok_and_fragments_stay():
+	assert filters.filter_item(HINT, "message", "Fulano: oi") == ""
+	assert filters.filter_item("ok", "message", "Fulano: oi") == "ok"
+	assert filters.filter_item("menu", "message", "Fulano: oi") == "menu"
+	assert filters.filter_item("Para mais informações", "message", "Fulano: oi") == "Para mais informações"
 	option("filterUsageHints", False)
-	assert filters.filter_text(hint, "message") == hint
+	assert filters.filter_item(HINT, "message", "Fulano: oi") == HINT
 
 
-def test_talvez_prefix_only_inside_lists():
+def test_usage_hint_is_cut_from_the_end_of_a_chat_name_only():
+	name = "Maria, disse oi. " + HINT
+	assert filters.filter_text(name, "chat") == "Maria, disse oi."
+	# Dentro de uma mensagem o texto e do usuario: nunca se corta.
+	message = "Ana: " + "Para mais opções, pressione a seta para a direita."
+	assert filters.filter_text(message, "message") == message
+	middle = "Maria: veja Para mais opções, pressione a seta e depois responda"
+	assert filters.filter_text(middle, "chat") == middle  # no meio: nao e frase final
+
+
+def test_ordinary_sentences_that_resemble_hints_stay():
+	normal = "Para mais opções de pagamento ligue amanhã"
+	assert filters.filter_text(normal, "chat") == normal
+	assert filters.filter_item(normal, "chat", "outro nome") == normal
+
+
+def test_talvez_prefix_only_on_chat_names_and_message_senders():
 	assert filters.filter_text("Talvez João Silva", "chat") == "João Silva"
-	assert filters.filter_text("Talvez João Silva", "message") == "João Silva"
-	assert filters.filter_text("Talvez João Silva", None) == "Talvez João Silva"
+	assert filters.filter_text("Talvez João Silva: oi", "message") == "João Silva: oi"
 	option("filterTalvez", False)
 	assert filters.filter_text("Talvez João Silva", "chat") == "Talvez João Silva"
 
 
-def test_talvez_in_the_middle_is_untouched():
+def test_talvez_inside_a_message_body_is_untouched():
+	for body in ("Talvez amanhã eu vá", "Maria: Talvez amanhã", "Maria: sim. Talvez João: oi"):
+		assert filters.filter_text(body, "message") == body, body
 	assert filters.filter_text("Ele disse Talvez amanhã", "chat") == "Ele disse Talvez amanhã"
+
+
+def test_line_breaks_are_preserved():
+	option("filterChatList", True)
+	text = "Talvez Ana  %s\nOntem,  10:30\n\nfoto" % PHONE
+	out = filters.filter_text(text, "chat")
+	assert out == "Ana \nOntem, 10:30\n\nfoto"
+	assert out.count("\n") == 3
 
 
 def test_empty_text_passes():
@@ -61,28 +100,43 @@ def test_empty_text_passes():
 	assert filters.filter_text(None, "chat") is None
 
 
-def test_speech_filter_only_inside_whatsapp():
+def test_speech_filter_touches_only_the_name_of_the_focused_row():
 	page = Page().overlay_all()
-	focus(page.msg_rows[0])
-	seq = ["Fulano %s disse oi" % PHONE, object(), "ok"]
+	row = page.msg_rows[0]
+	row.name = "%s: disse oi" % PHONE
+	focus(row)
+	seq = [row.name, object(), "ok", "Fulano %s no corpo" % PHONE]
 	out = filters.on_speech_sequence(seq)
-	assert PHONE not in out[0] and out[1] is seq[1] and out[2] == "ok"
+	assert out[0] == "disse oi"
+	assert out[1] is seq[1] and out[2] == "ok"
+	assert out[3] == seq[3]  # outro texto: intacto
+
+
+def test_speech_filter_ignores_everything_outside_rows_and_whatsapp():
+	page = Page().overlay_all()
+	focus(page.composer)  # campo de digitacao: eco de digitacao nunca e filtrado
+	seq = ["Talvez", "%s" % PHONE, HINT]
+	assert filters.on_speech_sequence(seq) is seq
+	focus(page.msg_rows[0].lastChild)  # botao dentro da linha
+	assert filters.on_speech_sequence(seq) is seq
 	other = Page(url="https://www.example.com/")
 	focus(other.composer)
 	assert filters.on_speech_sequence(seq) is seq
 
 
-def test_speech_filter_uses_the_list_of_the_focused_row():
+def test_speech_filter_uses_the_kind_of_the_focused_row():
 	page = Page().overlay_all()
-	focus(page.chat_rows[0])
-	out = filters.on_speech_sequence(["Talvez Ana %s" % PHONE])
+	row = page.chat_rows[0]
+	row.name = "Talvez Ana %s" % PHONE
+	focus(row)
+	out = filters.on_speech_sequence([row.name])
 	assert out == ["Ana %s" % PHONE]  # telefone na lista de conversas fica (padrao)
 
 
-def test_speech_filter_drops_items_that_become_empty():
+def test_speech_filter_drops_a_hint_item_that_is_the_whole_sentence():
 	page = Page().overlay_all()
 	focus(page.msg_rows[0])
-	assert filters.on_speech_sequence([PHONE, "ok"]) == ["ok"]
+	assert filters.on_speech_sequence([page.msg_rows[0].name, HINT]) == [page.msg_rows[0].name]
 
 
 def test_speech_filter_never_raises():

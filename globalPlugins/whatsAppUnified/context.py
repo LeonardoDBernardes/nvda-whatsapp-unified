@@ -2,8 +2,16 @@
 """Onde estamos? Aplicativo do WhatsApp, WhatsApp Web ou outra coisa.
 
 ``wa_context(obj)`` devolve "app", "web" ou None. Respeita a opção "escopo".
-Não existe um booleano global que vaze para outras abas: o veredito do Web é
-guardado por documento (referência fraca) e conferido pelo endereço do documento.
+
+Regras de desempenho (isto roda na thread principal do NVDA e na criação de
+TODO objeto de navegador):
+- o WhatsApp Web só é reconhecido pelo ENDEREÇO do documento (web.whatsapp.com).
+  O título da janela NÃO é usado: ele deixava qualquer aba chamada "WhatsApp"
+  disparar varreduras;
+- o veredito é guardado por tree interceptor (conferindo se o endereço mudou) e
+  por janela (hwnd) com validade curta, então objetos criados em seguida custam
+  uma consulta a dicionário;
+- a classificação de linhas é guardada por contêiner.
 """
 
 import re
@@ -11,7 +19,6 @@ import time
 import weakref
 
 import api
-import winUser
 
 from . import settings
 from .tree import (
@@ -19,8 +26,9 @@ from .tree import (
 	CELL_ROLES,
 	Role,
 	ancestors,
-	chat_list_of,
 	find_composer,
+	is_chat_list_container,
+	new_deadline,
 	safe_parent,
 	safe_role,
 )
@@ -29,12 +37,15 @@ from .tree import (
 # WhatsApp.Root.exe vira "whatsapp.root" (appModuleHandler.getAppNameFromProcessID).
 APP_NAME = "whatsapp.root"
 
+# Único endereço tratado como WhatsApp Web (não vale faq., www. nem o site institucional).
+WEB_HOST = "web.whatsapp.com"
+
 BROWSER_APPS = frozenset(
 	("chrome", "msedge", "firefox", "brave", "opera", "vivaldi", "chromium", "iexplore"),
 )
 
-# Endereço de site de verdade (ex.: web.whatsapp.com). Separa "o documento
-# aponta outro site" de "o documento não tem endereço utilizável".
+# Endereço de site de verdade. Separa "o documento aponta outro site" de
+# "o documento não tem endereço utilizável".
 _SITE_RE = re.compile(r"^(?:[a-z0-9-]+\.)+[a-z]{2,}$", re.IGNORECASE)
 
 
@@ -59,14 +70,7 @@ def host_of(url):
 
 
 def is_whatsapp_host(host):
-	return host == "whatsapp.com" or (host is not None and host.endswith(".whatsapp.com"))
-
-
-def _window_title_has_whatsapp():
-	try:
-		return "whatsapp" in winUser.getWindowText(winUser.getForegroundWindow()).lower()
-	except Exception:
-		return False
+	return host == WEB_HOST
 
 
 def url_is_whatsapp(url):
@@ -92,48 +96,112 @@ def document_url(doc):
 		return None
 
 
-def find_document(obj, limit=40):
-	"""O objeto de papel DOCUMENT que contém ``obj`` (ou o próprio), ou None."""
+def find_document(obj, limit=6):
+	"""O objeto de papel DOCUMENT que contém ``obj`` (ou o próprio), ou None.
+
+	Se ``obj`` é o foco, usa a cadeia de ancestrais do foco que o NVDA já tem
+	(nenhuma chamada ao WhatsApp). Senão sobe poucos pais (``limit`` pequeno).
+	"""
 	if safe_role(obj) == Role.DOCUMENT:
 		return obj
+	try:
+		focus = api.getFocusObject()
+	except Exception:
+		focus = None
+	if focus is not None and obj is focus:
+		try:
+			chain = list(api.getFocusAncestors())
+		except Exception:
+			chain = []
+		for parent in reversed(chain):
+			if safe_role(parent) == Role.DOCUMENT:
+				return parent
+		return None
 	for parent in ancestors(obj, limit):
 		if safe_role(parent) == Role.DOCUMENT:
 			return parent
 	return None
 
 
-# Veredito por documento (referência fraca). Se o objeto não aceitar
-# referência fraca, simplesmente não guarda.
-_web_cache = weakref.WeakKeyDictionary()
+# ─── veredito do WhatsApp Web ────────────────────────────────────────────────
+
+# Por tree interceptor (referência fraca): (endereço, veredito). Vale só
+# enquanto o endereço é o mesmo: se o buffer navegar para outro site, recalcula.
+_ti_cache = weakref.WeakKeyDictionary()
+# Por janela (hwnd): (instante, veredito, conhecido). Validade curta.
+_hwnd_cache = {}
+_HWND_TTL_KNOWN = 2.0
+_HWND_TTL_UNKNOWN = 0.5
+_HWND_MAX = 64
 
 
-def _is_web_whatsapp(obj):
-	holder = None
+def ti_verdict(ti):
+	"""True/False pelo endereço atual do documento do buffer; None se indisponível."""
 	try:
-		holder = getattr(obj, "treeInterceptor", None)
+		ident = ti.documentConstantIdentifier
 	except Exception:
-		holder = None
-	if holder is not None and getattr(holder, "_wa_verdict", None) is not None:
-		return holder._wa_verdict
-	doc = holder if holder is not None and hasattr(holder, "rootNVDAObject") else find_document(obj)
-	if doc is None:
-		return _window_title_has_whatsapp()
+		return None
+	if not ident:
+		return None
 	try:
-		cached = _web_cache.get(doc)
+		cached = _ti_cache.get(ti)
 	except TypeError:
 		cached = None
-	if cached is not None:
-		return cached
-	verdict = url_is_whatsapp(document_url(doc))
-	if verdict is None:
-		# Sem endereço utilizável (por exemplo identificador de buffer UIA):
-		# o título da janela é a reserva. Não guarda, pode melhorar depois.
-		return _window_title_has_whatsapp()
-	try:
-		_web_cache[doc] = verdict
-	except TypeError:
-		pass
+	if cached is not None and cached[0] == ident:
+		return cached[1]
+	verdict = url_is_whatsapp(ident)
+	if verdict is not None:
+		try:
+			_ti_cache[ti] = (ident, verdict)
+		except TypeError:
+			pass
 	return verdict
+
+
+def _remember_hwnd(hwnd, verdict, known=True):
+	if len(_hwnd_cache) >= _HWND_MAX:
+		_hwnd_cache.clear()
+	_hwnd_cache[hwnd] = (time.monotonic(), verdict, known)
+
+
+def _compute_web_verdict(obj):
+	"""(veredito, conhecido) sem usar o cache por janela."""
+	try:
+		holder = obj.treeInterceptor
+	except Exception:
+		holder = None
+	if holder is not None:
+		verdict = ti_verdict(holder)
+		if verdict is not None:
+			return verdict, True
+	doc = find_document(obj)
+	if doc is not None:
+		verdict = url_is_whatsapp(document_url(doc))
+		if verdict is not None:
+			return verdict, True
+	return False, False
+
+
+def web_verdict(obj):
+	"""O objeto de navegador está no WhatsApp Web (endereço confirmado)?"""
+	try:
+		hwnd = obj.windowHandle
+	except Exception:
+		hwnd = 0
+	hit = _hwnd_cache.get(hwnd) if hwnd else None
+	if hit is not None:
+		ttl = _HWND_TTL_KNOWN if hit[2] else _HWND_TTL_UNKNOWN
+		if time.monotonic() - hit[0] < ttl:
+			return hit[1]
+	verdict, known = _compute_web_verdict(obj)
+	if hwnd:
+		_remember_hwnd(hwnd, verdict, known)
+	return verdict
+
+
+def forget_web():
+	_ti_cache.clear()
+	_hwnd_cache.clear()
 
 
 def app_name_of(obj):
@@ -158,7 +226,7 @@ def raw_context(obj):
 		return "app"
 	if name in BROWSER_APPS:
 		try:
-			return "web" if _is_web_whatsapp(obj) else None
+			return "web" if web_verdict(obj) else None
 		except Exception:
 			return None
 	return None
@@ -172,38 +240,29 @@ def wa_context(obj):
 	return kind
 
 
-def web_title_hint(obj):
-	"""Pista barata: o título da janela de topo do objeto fala de WhatsApp?
+def is_web_document(doc):
+	"""O objeto raiz de um documento de navegador é o WhatsApp Web (endereço confirmado)?
 
-	Serve só para decidir se vale olhar a estrutura de um objeto recém-criado;
-	quem age de verdade confere o endereço do documento (``wa_context``).
+	Só o endereço decide. Sem endereço utilizável a resposta é não, nunca uma
+	adivinhação pelo título da janela.
 	"""
-	try:
-		top = winUser.getAncestor(obj.windowHandle, winUser.GA_ROOT)
-		return "whatsapp" in winUser.getWindowText(top or obj.windowHandle).lower()
-	except Exception:
+	if app_name_of(doc) not in BROWSER_APPS:
 		return False
-
-
-def is_web_document(obj):
-	"""Um documento de navegador (objeto raiz) que é o WhatsApp Web?
-
-	Não toca em ``obj.treeInterceptor`` (o objeto ainda está sendo criado quando
-	isto roda). Endereço primeiro; título da janela só sem endereço utilizável.
-	"""
-	if app_name_of(obj) not in BROWSER_APPS:
-		return False
-	verdict = url_is_whatsapp(document_url(obj))
-	if verdict is None:
-		return web_title_hint(obj)
-	return verdict
+	verdict = url_is_whatsapp(document_url(doc))
+	if verdict is not None:
+		try:
+			_remember_hwnd(doc.windowHandle, verdict)
+		except Exception:
+			pass
+	return bool(verdict)
 
 
 # ─── Que tipo de linha é este objeto? ────────────────────────────────────────
 
 _kind_cache = {}
-_KIND_TTL = 3.0
+_KIND_TTL = 10.0
 _KIND_MAX = 128
+_CONVERSATION_SECONDS = 0.15
 
 
 def _obj_key(obj):
@@ -217,17 +276,38 @@ def _obj_key(obj):
 
 
 def _in_conversation(container):
-	"""A lista ``container`` está dentro do painel da conversa (tem o campo de digitação por perto)?"""
+	"""A lista ``container`` está dentro do painel da conversa (tem o campo de digitação por perto)?
+
+	Sobe poucos níveis e procura o campo com orçamento pequeno, todos os níveis
+	dividindo um prazo curto.
+	"""
+	deadline = new_deadline(_CONVERSATION_SECONDS)
+	for parent in ancestors(container, 5):
+		if time.monotonic() > deadline:
+			return False
+		if find_composer(parent, budget=300, deadline=deadline) is not None:
+			return True
+	return False
+
+
+def classify_container(container):
+	"""'chat' | 'message' | None para o contêiner de linhas (guardado por contêiner)."""
 	key = _obj_key(container)
 	now = time.monotonic()
 	hit = _kind_cache.get(key)
 	if hit is not None and now - hit[0] < _KIND_TTL:
 		return hit[1]
-	result = False
-	for parent in ancestors(container, 10):
-		if find_composer(parent, budget=400) is not None:
-			result = True
+	result = None
+	node = container
+	for _level in range(7):
+		if node is None:
 			break
+		if is_chat_list_container(node):
+			result = "chat"
+			break
+		node = safe_parent(node)
+	if result is None and _in_conversation(container):
+		result = "message"
 	if len(_kind_cache) >= _KIND_MAX:
 		_kind_cache.clear()
 	_kind_cache[key] = (now, result)
@@ -241,13 +321,17 @@ def row_kind(obj):
 	- linha fora dela e dentro do painel da conversa = 'message'.
 	"""
 	role = safe_role(obj)
-	if role in ROW_ROLES or role in CELL_ROLES:
-		if chat_list_of(obj) is not None:
-			return "chat"
+	if role in CELL_ROLES:
+		row = safe_parent(obj)
+		container = safe_parent(row) if row is not None and safe_role(row) in ROW_ROLES else row
+		if container is None:
+			return None
+		return "chat" if classify_container(container) == "chat" else None
 	if role in ROW_ROLES:
-		parent = safe_parent(obj)
-		if parent is not None and _in_conversation(parent):
-			return "message"
+		container = safe_parent(obj)
+		if container is None:
+			return None
+		return classify_container(container)
 	return None
 
 

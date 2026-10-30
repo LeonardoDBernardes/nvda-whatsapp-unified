@@ -176,7 +176,7 @@ da Microsoft Store, que usa WebView2) e para o <strong>WhatsApp
 Web</strong> (Chrome, Edge, Brave e outros navegadores baseados em
 Chromium).</p>
 <ul>
-<li>Testado no NVDA 2026.2. Funciona a partir do NVDA 2025.1.</li>
+<li>Testado no NVDA 2026.2. Funciona a partir do NVDA 2026.1.</li>
 <li>Licença GPL-2 (arquivo <code>COPYING</code>).</li>
 <li>Os atalhos só valem quando o foco está no WhatsApp. Em qualquer
 outro programa, ou em outro site, todas as teclas seguem intactas para o
@@ -220,7 +220,10 @@ houver, na primeira).</td>
 </tr>
 <tr class="odd">
 <td>Alt+D</td>
-<td>Vai para o campo de digitação.</td>
+<td>Vai para o campo de digitação. <strong>No Chrome e no Edge, enquanto
+o foco está no WhatsApp Web, esta tecla substitui o "ir para a barra de
+endereço" do navegador</strong>; use Ctrl+L, que continua funcionando.
+Em qualquer outro site ou programa, o Alt+D é do navegador.</td>
 </tr>
 <tr class="even">
 <td>Shift+Alt+C</td>
@@ -296,8 +299,8 @@ cerca de 1,3 s) e fala.</td>
 </tr>
 <tr class="odd">
 <td>Ctrl+C</td>
-<td>Copia o texto da mensagem e fala "Copiado". Sem texto, a tecla segue
-para o WhatsApp.</td>
+<td>Copia o texto da mensagem e fala "Copiado". Sem texto, ou <strong>se
+você selecionou um trecho</strong>, a tecla segue para o WhatsApp.</td>
 </tr>
 </tbody>
 </table>
@@ -328,8 +331,9 @@ ambos.</td>
 <tr class="even">
 <td>Filtrar números de telefone nas mensagens</td>
 <td>Sim</td>
-<td>Tira os números de telefone ("+55 11 91234-5678") da fala das
-mensagens.</td>
+<td>Tira da fala o número de telefone que aparece como
+<strong>remetente</strong> da mensagem ("+55 11 91234-5678: texto"). O
+corpo da mensagem nunca é alterado.</td>
 </tr>
 <tr class="odd">
 <td>Filtrar números de telefone na lista de conversas</td>
@@ -339,12 +343,15 @@ mensagens.</td>
 <tr class="even">
 <td>Silenciar dicas de uso</td>
 <td>Sim</td>
-<td>Corta frases como "Para mais opções, pressione a seta...".</td>
+<td>Corta só frases completas conhecidas, como "Para mais opções,
+pressione a seta...", no fim do nome de uma conversa. Nunca mexe no
+texto de uma mensagem, no que você digita nem no campo de texto.</td>
 </tr>
 <tr class="odd">
 <td>Remover "Talvez" antes de nomes de contato</td>
 <td>Sim</td>
-<td>"Talvez João" vira "João".</td>
+<td>"Talvez João" vira "João", só no nome da conversa ou no remetente da
+mensagem. Nunca dentro do texto de uma mensagem.</td>
 </tr>
 <tr class="even">
 <td>Manter o modo foco automaticamente no WhatsApp Web, sem som de troca
@@ -387,7 +394,10 @@ global é da outra aba.</li>
 <h3 id="o-que-o-add-on-faz-1">O que o add-on faz</h3>
 <p>Uma classe de buffer própria (<code>WhatsAppChromeVBuf</code>,
 derivada da do Chromium) é usada <strong>só em documentos cujo endereço
-é do whatsapp.com</strong>:</p>
+é <code>web.whatsapp.com</code></strong> (as páginas de ajuda,
+<code>faq.whatsapp.com</code>, e o site institucional não são afetados).
+O título da janela nunca é usado para decidir: sem endereço confirmado,
+o add-on não faz nada:</p>
 <ol type="1">
 <li>Ela <strong>nasce em modo foco</strong> e fixa esse modo. Para
 qualquer objeto do WhatsApp ela responde sempre a mesma coisa. Sem
@@ -395,6 +405,10 @@ resposta variável, não há troca de modo, e portanto não há som.</li>
 <li>Ela acerta a variável global do NVDA ao nascer, ao receber o foco e
 a cada foco. Entrar no WhatsApp vindo de outra aba também é
 <strong>silencioso</strong> (zero sons).</li>
+<li><strong>Navegar para outro site na mesma aba solta a
+fixação</strong> (sem som), e voltar ao WhatsApp fixa de novo. Desligar
+a opção "Manter o modo foco automaticamente..." vale na hora, sem
+recarregar a página.</li>
 <li>O mesmo mecanismo é usado pelo próprio NVDA no Internet Explorer
 (MSHTML) e no Excel.</li>
 </ol>
@@ -428,7 +442,10 @@ tela fala algo como "grade", "documento" ou nada.</p>
 <li>O add-on lembra a última conversa ou mensagem que recebeu foco.</li>
 <li>Se o foco cai num desses lugares e <strong>você não apertou</strong>
 uma tecla que tira o foco de propósito (Esc, Tab, Enter, F6, Windows),
-ele <strong>não</strong> fala o contêiner na hora. Espera 200 ms.</li>
+ele <strong>não</strong> fala o contêiner na hora. Espera 200 ms. Um
+<strong>clique de mouse</strong> recente (ou botão apertado) também
+conta como movimento legítimo: nesse caso o add-on não recupera nada e o
+foco é falado normalmente.</li>
 <li>Se o foco continua lá, devolve o foco à linha lembrada. Se ela foi
 desmontada, usa a linha selecionada da mesma lista, depois a mais
 próxima pela posição, depois a primeira. O NVDA fala a linha
@@ -577,7 +594,7 @@ modo</h3>
 ligada e o escopo inclui o Web.</li>
 <li>Confira se a opção de UIA para Chromium está em "Padrão"
 (acima).</li>
-<li>Confira o endereço: só vale para <code>*.whatsapp.com</code>.</li>
+<li>Confira o endereço: só vale para <code>web.whatsapp.com</code>.</li>
 <li>Se você apertou NVDA+Espaço de propósito, o som é do NVDA e é
 esperado.</li>
 </ol>
@@ -594,8 +611,8 @@ vazio. Apertar uma seta uma vez também restaura os nomes.</p>
 <h3 id="a-recuperação-de-foco-atrapalha">A recuperação de foco
 atrapalha</h3>
 <p>Desligue "Recuperar o foco quando o WhatsApp o perde". Ela nunca age
-logo depois de Esc, Tab, Enter, F6 ou Windows, e no máximo uma vez por
-segundo.</p>
+logo depois de Esc, Tab, Enter, F6, Windows ou de um clique de mouse, e
+no máximo uma vez por segundo.</p>
 <h3 id="meu-antigo-nvdaini">Meu antigo <code>nvda.ini</code></h3>
 <p>A seção <code>whatsAppUnified</code> continua a mesma. Chaves antigas
 são toleradas.</p>

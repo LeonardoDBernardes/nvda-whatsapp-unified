@@ -38,9 +38,17 @@ LIST_ROLES = frozenset(r for r in (Role.TABLE, getattr(Role, "DATAGRID", None), 
 ROW_ROLES = frozenset((Role.TABLEROW,))
 CELL_ROLES = frozenset((Role.TABLECELL,))
 
-# Limites para que uma busca nunca congele o NVDA.
+# Limites para que uma busca nunca congele o NVDA (thread principal).
+# Um comando inteiro gasta no máximo COMMAND_SECONDS, não importa quantas
+# caminhadas faça: todas dividem o mesmo prazo (``deadline``).
 DEFAULT_BUDGET = 2500
-DEFAULT_SECONDS = 1.5
+DEFAULT_SECONDS = 0.25
+COMMAND_SECONDS = 0.3
+
+
+def new_deadline(seconds=COMMAND_SECONDS):
+	"""Instante limite (time.monotonic) para um comando inteiro."""
+	return time.monotonic() + seconds
 
 
 def safe_role(obj):
@@ -121,20 +129,24 @@ def iter_children_reversed(obj, limit=None):
 			return
 
 
-def walk(root, predicate, budget=DEFAULT_BUDGET, seconds=DEFAULT_SECONDS, skip=None, first=True):
+def walk(root, predicate, budget=DEFAULT_BUDGET, seconds=DEFAULT_SECONDS, skip=None, first=True, deadline=None):
 	"""Busca em largura a partir de ``root``.
 
 	Devolve o primeiro objeto que satisfaz ``predicate`` (``first=True``) ou a
-	lista de todos. ``skip(obj)`` verdadeiro poda aquele ramo.
+	lista de todos. ``skip(obj)`` verdadeiro poda aquele ramo. O prazo é o
+	menor entre ``seconds`` a partir de agora e ``deadline`` (instante absoluto,
+	para vários passos de um mesmo comando dividirem o mesmo tempo).
 	"""
 	if root is None:
 		return None if first else []
 	found = []
 	queue = [root]
 	index = 0
-	deadline = time.monotonic() + seconds
+	limit = time.monotonic() + seconds
+	if deadline is not None:
+		limit = min(limit, deadline)
 	while index < len(queue) and index < budget:
-		if time.monotonic() > deadline:
+		if time.monotonic() > limit:
 			break
 		obj = queue[index]
 		index += 1
@@ -187,12 +199,12 @@ def is_composer(obj):
 	return bool(COMPOSER_NAME_RE.search(safe_name(obj)))
 
 
-def find_composer(root, budget=1200):
-	return walk(root, is_composer, budget=budget)
+def find_composer(root, budget=1200, deadline=None):
+	return walk(root, is_composer, budget=budget, deadline=deadline)
 
 
-def find_chat_list(root):
-	return walk(root, is_chat_list_container)
+def find_chat_list(root, deadline=None):
+	return walk(root, is_chat_list_container, deadline=deadline)
 
 
 def rows_of(container, limit=400):
@@ -217,22 +229,27 @@ def rows_of(container, limit=400):
 	return rows
 
 
-def find_message_list(root):
+def find_message_list(root, deadline=None):
 	"""O contêiner das linhas de mensagem da conversa aberta, ou None.
 
 	Parte do campo de digitação e sobe até um ancestral que tenha linhas fora
-	da lista de conversas. O pai dessas linhas é a lista de mensagens.
+	da lista de conversas. O pai dessas linhas é a lista de mensagens. Todos os
+	passos dividem o mesmo prazo.
 	"""
-	composer = find_composer(root)
+	if deadline is None:
+		deadline = new_deadline()
+	composer = find_composer(root, deadline=deadline)
 	if composer is None:
 		return None
 	for parent in ancestors(composer, 10):
+		if time.monotonic() > deadline:
+			return None
 		row = walk(
 			parent,
 			lambda o: safe_role(o) in ROW_ROLES,
 			budget=600,
-			seconds=0.8,
 			skip=is_chat_list_container,
+			deadline=deadline,
 		)
 		if row is not None and chat_list_of(row) is None:
 			return safe_parent(row)
@@ -246,8 +263,13 @@ def selected_or_first(rows):
 	return rows[0] if rows else None
 
 
-def document_root(focus=None):
-	"""A raiz do documento do WhatsApp onde está o foco (None se não achar)."""
+def document_root(focus=None, allow_foreground=False):
+	"""A raiz do documento do WhatsApp onde está o foco (None se não achar).
+
+	Usa a cadeia de ancestrais do foco, que o NVDA já tem pronta (sem chamadas
+	ao WhatsApp). Só o aplicativo aceita a janela de primeiro plano como
+	reserva (``allow_foreground``); no navegador isso seria varrer o Chrome todo.
+	"""
 	if focus is None:
 		try:
 			focus = api.getFocusObject()
@@ -265,6 +287,8 @@ def document_root(focus=None):
 			root = obj
 	if root is not None:
 		return root
+	if not allow_foreground:
+		return None
 	try:
 		return api.getForegroundObject()
 	except Exception:

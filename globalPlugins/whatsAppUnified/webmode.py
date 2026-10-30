@@ -38,7 +38,9 @@ O QUE CONTINUA NATIVO:
   ``script_disablePassThrough`` repassa a tecla à página (fecha conversa, etc.)
   em vez de sair do modo foco. Sem isso o Escape tocaria o som de navegação;
 - outros sites: a sobreposição só vale se o endereço do documento é
-  ``*.whatsapp.com``; qualquer outro documento usa o ChromeVBuf original.
+  ``web.whatsapp.com``; qualquer outro documento usa o ChromeVBuf original.
+  Se o mesmo buffer navegar para outro endereço, o veredito é refeito e o modo
+  foco fixo é solto.
 
 LIMITES (documentados no README): vale para o Chromium com IAccessible2, que é o
 padrão do NVDA (``allowInChromium = 0``). Se o usuário ligou UI Automation para
@@ -47,6 +49,7 @@ Sair do WhatsApp para uma página em modo de navegação pode tocar UM som, o
 mesmo que o NVDA toca ao mudar de modo entre documentos.
 """
 
+import api
 import browseMode
 import controlTypes
 from controlTypes import OutputReason
@@ -54,7 +57,7 @@ from NVDAObjects.IAccessible import chromium
 from NVDAObjects.IAccessible.chromium import ChromeVBuf
 
 from . import settings
-from .context import url_is_whatsapp, web_title_hint
+from .context import ti_verdict
 
 
 def editable_and_available(obj):
@@ -67,10 +70,16 @@ def editable_and_available(obj):
 
 
 class WhatsAppChromeVBuf(ChromeVBuf):
-	"""Buffer do Chromium para documentos do WhatsApp Web, em modo foco fixo."""
+	"""Buffer do Chromium para documentos do WhatsApp Web, em modo foco fixo.
 
-	_wa_decided = False  # o veredito (WhatsApp ou não) já saiu do endereço?
-	_wa_verdict = None  # True/False quando decidido; lido por context._is_web_whatsapp
+	O veredito (este documento é o WhatsApp Web?) vem do ENDEREÇO e é refeito
+	sempre que o endereço do documento muda: se o mesmo buffer navegar para
+	outro site, o modo foco é solto e o buffer volta a se comportar como o
+	original. A opção "manter o modo foco automaticamente" também vale na hora,
+	sem recarregar a página (na próxima decisão de foco).
+	"""
+
+	_wa_verdict = True  # nasceu de um documento confirmado pelo endereço
 	_wa_pinned = False  # modo foco fixado por esta classe
 
 	def __init__(self, rootNVDAObject):
@@ -79,34 +88,36 @@ class WhatsAppChromeVBuf(ChromeVBuf):
 
 	# ─── veredito e fixação do modo foco ────────────────────────────────────
 
-	def _wa_is_whatsapp(self):
-		if self._wa_decided:
-			return bool(self._wa_verdict)
-		try:
-			verdict = url_is_whatsapp(self.documentConstantIdentifier)
-		except Exception:
-			verdict = None
-		if verdict is None:
-			# Sem endereço utilizável ainda: o título é a reserva e não fica guardado.
-			return web_title_hint(self.rootNVDAObject)
-		self._wa_decided = True
-		self._wa_verdict = verdict
-		return verdict
-
 	def _wa_enabled(self):
 		return settings.scope_allows("web") and bool(settings.get("autoFocusMode"))
 
 	def _wa_update(self):
-		"""Fixa o modo foco uma única vez, quando o documento é o WhatsApp Web."""
-		if self._wa_pinned:
-			return
-		if self._wa_is_whatsapp() and self._wa_enabled():
+		"""Fixa ou solta o modo foco conforme o endereço atual e a opção."""
+		verdict = ti_verdict(self)  # lê o endereço atual (o NVDA guarda por ciclo)
+		if verdict is not None:
+			self._wa_verdict = verdict
+		want = self._wa_verdict and self._wa_enabled()
+		if want and not self._wa_pinned:
 			self._wa_pinned = True
-			self._wa_decided = True
-			self._wa_verdict = True
 			self._disableAutoPassThrough = True
 			self._passThrough = True
 			browseMode.reportPassThrough.last = True
+		elif self._wa_pinned and not want:
+			self._wa_pinned = False
+			self._disableAutoPassThrough = False
+			# Volta à regra nativa para o objeto em foco (sem som: o "último modo
+			# anunciado" passa a ser o modo novo).
+			self._passThrough = self._native_pass_through_for_focus()
+			browseMode.reportPassThrough.last = self._passThrough
+
+	def _native_pass_through_for_focus(self):
+		try:
+			focus = api.getFocusObject()
+			if focus is not None:
+				return bool(super().shouldPassThrough(focus, OutputReason.FOCUS))
+		except Exception:
+			pass
+		return False
 
 	def _wa_sync_last(self):
 		"""Faz o "último modo anunciado" do NVDA coincidir com o deste documento."""
@@ -116,7 +127,8 @@ class WhatsAppChromeVBuf(ChromeVBuf):
 	# ─── decisão de modo ─────────────────────────────────────────────────────
 
 	def shouldPassThrough(self, obj, reason=None):
-		if reason in (OutputReason.FOCUS, OutputReason.CARET) and self._wa_pinned and self._wa_enabled():
+		self._wa_update()
+		if reason in (OutputReason.FOCUS, OutputReason.CARET) and self._wa_pinned:
 			if self.disableAutoPassThrough:
 				# Modo foco fixado: SEMPRE a mesma resposta, para qualquer objeto.
 				return True

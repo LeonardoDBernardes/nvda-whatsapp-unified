@@ -20,7 +20,7 @@ from scriptHandler import script
 from speech.extensions import filter_speechSequence
 
 from . import filters, messagetext, overlays, recovery, settings, tree
-from .context import document_url, find_document, raw_context, wa_context
+from .context import document_url, find_document, forget_kinds, forget_web, raw_context, wa_context
 
 addonHandler.initTranslation()
 
@@ -41,12 +41,26 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		filter_speechSequence.unregister(filters.on_speech_sequence)
 		recovery.unregister_keys()
 		recovery.reset()
+		# Solta referências a objetos do WhatsApp e vereditos guardados (a recarga
+		# do NVDA+Ctrl+F3 cria um pacote novo; nada pode ficar apontando para o velho).
+		overlays.reset_page_memory()
+		forget_web()
+		forget_kinds()
 		settings.remove_panel()
 		super().terminate()
 
 	# ─── nunca engolir tecla ─────────────────────────────────────────────────
 
 	def getScript(self, gesture):
+		"""Fora do WhatsApp (ou do escopo) devolve None.
+
+		Conferido no NVDA 2026.2 (scriptHandler._findScript): o NVDA percorre o
+		objeto em foco, o buffer, o módulo do aplicativo e CADA plugin global em
+		ordem, e usa o primeiro script achado. Um plugin que devolve None é como
+		se não existisse: a tecla segue para os outros plugins e para o mapa
+		global do NVDA. O mapa deste plugin só tem os nossos comandos, então não
+		há nada nativo para "devolver" aqui.
+		"""
 		found = super().getScript(gesture)
 		if found is None:
 			return None
@@ -60,6 +74,15 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			return wa_context(api.getFocusObject()) is not None
 		except Exception:
 			return False
+
+	@staticmethod
+	def _root():
+		"""Raiz do documento do foco; só o aplicativo aceita a janela inteira como reserva."""
+		try:
+			focus = api.getFocusObject()
+			return tree.document_root(focus, allow_foreground=raw_context(focus) == "app")
+		except Exception:
+			return None
 
 	# ─── objetos e eventos ───────────────────────────────────────────────────
 
@@ -89,7 +112,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 	@script(description=_("Ir para lista de conversas"), gesture="kb:alt+1")
 	def script_goToChatList(self, gesture):
-		container = tree.find_chat_list(tree.document_root())
+		container = tree.find_chat_list(self._root(), tree.new_deadline())
 		if container is None:
 			ui.message(_("Lista de conversas não encontrada"))
 			return
@@ -98,7 +121,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 	@script(description=_("Ir para lista de mensagens"), gesture="kb:alt+2")
 	def script_goToMessageList(self, gesture):
-		container = tree.find_message_list(tree.document_root())
+		container = tree.find_message_list(self._root(), tree.new_deadline())
 		if container is None:
 			ui.message(_("Lista de mensagens não encontrada"))
 			return
@@ -110,7 +133,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 	@script(description=_("Ir para campo de digitação"), gesture="kb:alt+d")
 	def script_focusComposer(self, gesture):
-		composer = tree.find_composer(tree.document_root())
+		composer = tree.find_composer(self._root(), deadline=tree.new_deadline())
 		if composer is None:
 			ui.message(_("Campo de digitação não encontrado"))
 			return
@@ -118,7 +141,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 	@script(description=_("Abrir menu de chamada"), gesture="kb:shift+alt+c")
 	def script_openCallMenu(self, gesture):
-		button = messagetext.call_button(tree.document_root())
+		button = messagetext.call_button(self._root(), tree.new_deadline())
 		if button is None:
 			ui.message(_("Botão de chamada não encontrado"))
 			return

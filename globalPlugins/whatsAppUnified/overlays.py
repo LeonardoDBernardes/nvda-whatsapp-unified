@@ -3,8 +3,8 @@
 
 Cada comportamento por objeto vive numa classe que o NVDA mistura ao objeto só
 quando ele é uma linha do WhatsApp. Os atalhos de ``MessageRow`` valem enquanto
-o foco está numa mensagem; fora dela a tecla segue para a página sem passar por
-este add-on (``getScript`` devolve None).
+o foco está numa mensagem; fora do nosso caso ``getScript`` devolve exatamente
+o que o NVDA devolveria sem o add-on.
 
 Só objetos IAccessible entram aqui: misturar classes IAccessible e UIA gerou
 objetos quebrados na 1.2.x.
@@ -12,7 +12,9 @@ objetos quebrados na 1.2.x.
 
 import api
 import controlTypes
+import inputCore
 import oleacc
+import textInfos
 import ui
 import winUser
 from NVDAObjects import NVDAObject
@@ -28,8 +30,7 @@ from .context import (
 	app_name_of,
 	is_web_document,
 	row_kind,
-	web_title_hint,
-	wa_context,
+	web_verdict,
 	APP_NAME,
 )
 from .tree import CELL_ROLES, ROW_ROLES, State, is_defunct, safe_role
@@ -53,35 +54,57 @@ class ChatListRow(NVDAObject):
 		self.wa_kind = "chat"
 
 
+# Teclas da linha de mensagem -> nome do script. NÃO são ligadas por
+# ``@script(gesture=...)``: um gesto ligado na classe entra no mapa do objeto e
+# esconde o que o NVDA ou outra classe tinha na mesma tecla, mesmo quando
+# ``getScript`` devolve None. Aqui ``getScript`` consulta esta tabela e, fora do
+# nosso caso, devolve exatamente o que o NVDA devolveria sem o add-on.
+_MESSAGE_KEYS = {
+	inputCore.normalizeGestureIdentifier(gesture): name
+	for gesture, name in (
+		("kb:enter", "playMessage"),
+		("kb:alt+p", "audioToggle"),
+		("kb:control+s", "audioSpeed"),
+		("kb:shift+enter", "contextMenu"),
+		("kb:control+shift+enter", "reactMessage"),
+		("kb:control+r", "readFull"),
+		("kb:alt+enter", "browseMessage"),
+		("kb:alt+c", "textWindow"),
+		("kb:control+c", "copyMessage"),
+	)
+}
+
+
 class MessageRow(NVDAObject):
 	"""Linha da lista de mensagens da conversa aberta."""
 
 	wa_kind = "message"
 	scriptCategory = CATEGORY
+	_wa_ctx = "web"
 
 	def initOverlayClass(self):
 		self.wa_kind = "message"
-
-	# Tecla -> o que precisa existir na mensagem para a tecla ser nossa.
-	_NEEDS = {
-		"script_playMessage": messagetext.play_target,
-		"script_audioToggle": lambda row: messagetext.find_player(row)[1],
-		"script_audioSpeed": messagetext.speed_target,
-	}
+		# Calculado uma vez, na criação: o que o getScript usa a cada tecla é só isto.
+		self._wa_ctx = "web" if app_name_of(self) in BROWSER_APPS else "app"
 
 	def getScript(self, gesture):
-		found = super().getScript(gesture)
-		if found is None:
-			return None
-		if wa_context(self) is None:
-			return None
-		needs = self._NEEDS.get(getattr(found, "__name__", ""))
-		if needs is not None and needs(self) is None:
-			# Sem player nesta mensagem: a tecla é da página (Enter, Alt+P, Ctrl+S).
-			return None
-		return found
+		"""Decisão BARATA: sem caminhar pela árvore (roda no gancho de teclado).
 
-	@script(description=_("Tocar ou pausar mensagem de voz ou vídeo"), gesture="kb:enter")
+		Quem decide se há player, texto ou botão é o próprio script, que, se não
+		for o caso, repassa a tecla com ``gesture.send()`` (local à linha).
+		"""
+		if settings.scope_allows(self._wa_ctx):
+			try:
+				identifiers = gesture.normalizedIdentifiers
+			except Exception:
+				identifiers = ()
+			for identifier in identifiers:
+				name = _MESSAGE_KEYS.get(identifier)
+				if name is not None:
+					return getattr(self, "script_" + name)
+		return super().getScript(gesture)
+
+	@script(description=_("Tocar ou pausar mensagem de voz ou vídeo"))
 	def script_playMessage(self, gesture):
 		target = messagetext.play_target(self)
 		if target is None:
@@ -89,7 +112,7 @@ class MessageRow(NVDAObject):
 			return
 		target.doAction()
 
-	@script(description=_("Pausar ou retomar o áudio da mensagem"), gesture="kb:alt+p")
+	@script(description=_("Pausar ou retomar o áudio da mensagem"))
 	def script_audioToggle(self, gesture):
 		buttons, slider = messagetext.find_player(self)
 		if slider is None:
@@ -97,7 +120,7 @@ class MessageRow(NVDAObject):
 			return
 		(buttons[-1] if buttons else slider).doAction()
 
-	@script(description=_("Aumentar ou diminuir a velocidade do áudio"), gesture="kb:control+s")
+	@script(description=_("Aumentar ou diminuir a velocidade do áudio"))
 	def script_audioSpeed(self, gesture):
 		target = messagetext.speed_target(self)
 		if target is None:
@@ -105,7 +128,7 @@ class MessageRow(NVDAObject):
 			return
 		target.doAction()
 
-	@script(description=_("Menu de contexto da mensagem"), gesture="kb:shift+enter")
+	@script(description=_("Menu de contexto da mensagem"))
 	def script_contextMenu(self, gesture):
 		button = messagetext.menu_button(self)
 		if button is not None:
@@ -115,7 +138,7 @@ class MessageRow(NVDAObject):
 
 		KeyboardInputGesture.fromName("applications").send()
 
-	@script(description=_("Reagir à mensagem"), gesture="kb:control+shift+enter")
+	@script(description=_("Reagir à mensagem"))
 	def script_reactMessage(self, gesture):
 		button = messagetext.react_button(self)
 		if button is None:
@@ -123,14 +146,14 @@ class MessageRow(NVDAObject):
 			return
 		button.doAction()
 
-	@script(description=_("Ler mensagem completa"), gesture="kb:control+r")
+	@script(description=_("Ler mensagem completa"))
 	def script_readFull(self, gesture):
 		def speak(text):
 			ui.message(text if text else _("Texto não encontrado"))
 
 		messagetext.expand_then(self, speak)
 
-	@script(description=_("Abrir mensagem em modo de navegação"), gesture="kb:alt+enter")
+	@script(description=_("Abrir mensagem em modo de navegação"))
 	def script_browseMessage(self, gesture):
 		def show(text):
 			if text:
@@ -140,7 +163,7 @@ class MessageRow(NVDAObject):
 
 		messagetext.expand_then(self, show)
 
-	@script(description=_("Abrir mensagem em janela de texto"), gesture="kb:alt+c")
+	@script(description=_("Abrir mensagem em janela de texto"))
 	def script_textWindow(self, gesture):
 		def show(text):
 			if not text:
@@ -152,14 +175,37 @@ class MessageRow(NVDAObject):
 
 		messagetext.expand_then(self, show)
 
-	@script(description=_("Copiar mensagem"), gesture="kb:control+c")
+	@script(description=_("Copiar mensagem"))
 	def script_copyMessage(self, gesture):
+		if self._has_selection():
+			# Há texto selecionado: o Ctrl+C é da página (copia só a seleção).
+			gesture.send()
+			return
 		text = messagetext.message_text(self)
 		if not text:
 			gesture.send()
 			return
 		api.copyToClip(text)
 		ui.message(_("Copiado"))
+
+
+	def _has_selection(self):
+		"""Há texto selecionado na linha (ou no documento)? Qualquer dúvida = não."""
+		holders = [self]
+		try:
+			holder = self.treeInterceptor
+		except Exception:
+			holder = None
+		if holder is not None:
+			holders.append(holder)
+		for item in holders:
+			try:
+				info = item.makeTextInfo(textInfos.POSITION_SELECTION)
+				if not info.isCollapsed:
+					return True
+			except Exception:
+				continue
+		return False
 
 
 class SelectionPopup(IAccessible):
@@ -196,6 +242,12 @@ class _PageMemory:
 	last = None
 
 
+def reset_page_memory():
+	"""Solta as referências (chamado ao encerrar o plugin e na recarga)."""
+	_PageMemory.hwnd = 0
+	_PageMemory.last = None
+
+
 def note_page_focus(obj):
 	"""Chamado a cada foco no WhatsApp: guarda a janela da página e o objeto focado."""
 	try:
@@ -206,6 +258,13 @@ def note_page_focus(obj):
 		pass
 
 
+def _usable(obj):
+	"""Objeto ainda vivo? Objeto morto (linha desmontada, erro de COM) não serve."""
+	if obj is None:
+		return False
+	return not is_defunct(obj)
+
+
 def real_page_focus():
 	"""Elemento que de fato tem o foco do teclado na página, ou None."""
 	hwnd = _PageMemory.hwnd
@@ -213,13 +272,14 @@ def real_page_focus():
 		try:
 			document = getNVDAObjectFromEvent(hwnd, winUser.OBJID_CLIENT, 0)
 			active = document.activeChild if document else None
-			if active:
+			if _usable(active):
 				return active
 		except Exception:
 			pass
 	last = _PageMemory.last
-	if last is not None and not is_defunct(last):
+	if _usable(last):
 		return last
+	_PageMemory.last = None
 	return None
 
 
@@ -234,10 +294,13 @@ class HostPane(NVDAObject):
 	_cache_focusRedirect = True
 
 	def _get_focusRedirect(self):
-		target = real_page_focus()
-		if target is None or target == self:
+		try:
+			target = real_page_focus()
+			if target is None or target is self:
+				return None
+			return target
+		except Exception:
 			return None
-		return target
 
 
 # ─── escolha das classes ─────────────────────────────────────────────────────
@@ -271,7 +334,9 @@ def choose_overlay_classes(obj, clsList, contexts):
 				clsList.insert(0, WhatsAppWebDocument)
 			return
 
-		if ctx == "web" and not web_title_hint(obj):
+		# Objeto de navegador: só com o documento confirmado como web.whatsapp.com
+		# pelo ENDEREÇO (consulta guardada por janela; nada de título nem de varredura).
+		if ctx == "web" and not web_verdict(obj):
 			return
 
 		try:
