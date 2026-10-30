@@ -139,14 +139,31 @@ def test_option_off_stays_on_the_reactions(plugin):
 
 # ─── setas: nunca saem do menu ──────────────────────────────────────────────
 
-def test_arrows_walk_the_options_and_wrap_never_leaving_the_menu(plugin, monkeypatch):
+def test_arrows_walk_the_options_and_stop_at_the_last(plugin):
+	"""2.0.5: a volta da ultima para a primeira fazia o WhatsApp fechar o menu."""
 	page = real_page()
 	bar, reactions, options_menu, items = open_and_land(plugin, page)
-	for expected in (items[1], items[2], items[0]):
+	for expected in (items[1], items[2]):
 		script, gesture = press(plugin, "downArrow")
 		assert script is not None and gesture.sent == 0
 		assert api.getFocusObject() is expected
 		deliver(plugin, expected)
+	calls = items[0].focus_calls
+	spoken = len(speech.spoken)
+	script, gesture = press(plugin, "downArrow")
+	assert gesture.sent == 0 and keyboardHandler.sent == ["tab"]
+	assert api.getFocusObject() is items[2] and items[0].focus_calls == calls
+	assert speech.spoken[spoken:] and speech.spoken[-1][1] is items[2]  # repete a ultima
+
+
+def test_up_on_the_reaction_bar_stays_on_the_bar(plugin):
+	page = real_page()
+	start_on_message(plugin, page)
+	bar, reactions, options_menu, items = open_real_menu(page)
+	deliver(plugin, items[0])
+	deliver(plugin, reactions[1])  # voltou a barra de proposito
+	script, gesture = press(plugin, "upArrow")
+	assert gesture.sent == 0 and api.getFocusObject() is reactions[1]
 
 
 def test_down_on_the_reaction_bar_goes_to_the_options(plugin):
@@ -170,15 +187,15 @@ def test_up_on_the_first_option_goes_back_to_the_reaction_bar(plugin):
 	assert keyboardHandler.sent == ["shift+tab"] and gesture.sent == 0
 
 
-def test_up_on_the_first_option_without_a_bar_goes_to_the_last(plugin):
+def test_up_on_the_first_option_without_a_bar_stays_on_the_first(plugin):
 	page = real_page()
 	start_on_message(plugin, page)
 	items = [Node(Role.MENUITEM, o, states={State.FOCUSABLE}) for o in ("A", "B", "C")]
 	popup = Node(Role.POPUPMENU, "", children=items)
 	page.doc.add(popup)
 	deliver(plugin, items[0])
-	press(plugin, "upArrow")
-	assert api.getFocusObject() is items[2]
+	script, gesture = press(plugin, "upArrow")
+	assert api.getFocusObject() is items[0] and gesture.sent == 0
 	assert keyboardHandler.sent == []
 
 

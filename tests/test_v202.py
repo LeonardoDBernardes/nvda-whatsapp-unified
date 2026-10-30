@@ -162,7 +162,7 @@ def test_down_and_up_arrows_walk_the_options_and_up_on_the_first_goes_to_the_rea
 	assert api.getFocusObject() is items[2]
 	deliver(plugin, items[2])
 	plugin.getScript(down)(down)
-	assert api.getFocusObject() is items[0]  # volta ao inicio, nunca escorrega para a mensagem
+	assert api.getFocusObject() is items[2]  # para na ultima (2.0.5), nunca escorrega para a mensagem
 	deliver(plugin, items[0])
 	up = Gesture("upArrow")
 	plugin.getScript(up)(up)

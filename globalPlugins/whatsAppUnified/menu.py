@@ -59,6 +59,11 @@ mensagem de baixo ou de cima"; "no Web, Espaço e Esc me jogam nas reações";
   fecha o menu: só repete a opção em foco. Sem limite de tempo (2.0.4: na 2.0.3
   eram 1,5 s, e o Leo aperta as teclas em sequência, não juntas); o Esc
   seguinte fecha o menu.
+- 2.0.5, relato do Leo: descendo até o fim do menu o foco ia para a mensagem de
+  baixo ou de cima. O log mostrou: a seta na última opção dava a volta à
+  primeira (setFocus) e logo depois o WhatsApp fechava o menu. Agora o menu
+  PARA nas pontas: seta para baixo na última opção e seta para cima na barra
+  de reações (ou na primeira opção, sem barra) só repetem onde o foco está.
 """
 
 import api
@@ -234,7 +239,10 @@ def target_for(direction, focus=None):
 
 	Seta para cima na primeira opção: a fileira de reações de dentro do menu
 	(menu antigo), ou BACK_TO_TRAY se a barra de reações separada apareceu,
-	senão a última opção.
+	senão a própria primeira opção. Seta para baixo na última opção devolve a
+	própria última: o menu PARA nas pontas, sem dar a volta (2.0.5: na 2.0.4 a
+	volta à primeira opção fazia o WhatsApp fechar o menu e o foco caía na
+	mensagem de baixo ou de cima).
 	"""
 	container = _Menu.container
 	items = items_of(container)
@@ -244,11 +252,13 @@ def target_for(direction, focus=None):
 		focus = api.getFocusObject()
 	index = _index(items, focus)
 	if direction > 0:
-		return items[index + 1] if 0 <= index < len(items) - 1 else items[0]
+		if index < 0:
+			return items[0]
+		return items[min(index + 1, len(items) - 1)]
 	if index > 0:
 		return items[index - 1]
 	if index == 0:
-		return tray_first(container, items) or (BACK_TO_TRAY if _Menu.tray_seen else items[-1])
+		return tray_first(container, items) or (BACK_TO_TRAY if _Menu.tray_seen else items[0])
 	return items[-1]
 
 
@@ -310,13 +320,16 @@ def move(direction, gesture):
 			diag.act("menu-barra-tab", "")
 			_send("tab")
 		else:
-			gesture.send()
+			_at_edge(api.getFocusObject())  # acima da barra não há nada: fica nela
 		return
 	focus = api.getFocusObject()
 	current = _current(focus)
 	target = target_for(direction, current)
 	if target is None:
 		gesture.send()
+		return
+	if target == current:
+		_at_edge(current)
 		return
 	if target is BACK_TO_TRAY:
 		diag.act("menu-volta-barra", "")
@@ -329,6 +342,15 @@ def move(direction, gesture):
 	except Exception:
 		pass
 	core.callLater(MOVE_CHECK_MS, _check_followed, focus, target)
+
+
+def _at_edge(obj):
+	"""Ponta do menu: o foco fica onde está e a opção é repetida (sem dar a volta)."""
+	diag.act("menu-ponta", diag.role_name(obj))
+	try:
+		speech.speakObject(obj, reason=OutputReason.FOCUS)
+	except Exception:
+		pass
 
 
 def _check_followed(origin, target):

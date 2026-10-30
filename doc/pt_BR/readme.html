@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>WhatsApp Unificado 2.0.4</title>
+  <title>WhatsApp Unificado 2.0.5</title>
   <style>
     html {
       color: #1a1a1a;
@@ -166,11 +166,11 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">WhatsApp Unificado 2.0.4</h1>
+<h1 class="title">WhatsApp Unificado 2.0.5</h1>
 </header>
 <h1
-id="whatsapp-unificado-204--acessibilidade-do-whatsapp-para-o-nvda">WhatsApp
-Unificado 2.0.4 — acessibilidade do WhatsApp para o NVDA</h1>
+id="whatsapp-unificado-205--acessibilidade-do-whatsapp-para-o-nvda">WhatsApp
+Unificado 2.0.5 — acessibilidade do WhatsApp para o NVDA</h1>
 <p>Add-on do NVDA para o <strong>WhatsApp Desktop</strong> (o aplicativo
 da Microsoft Store, que usa WebView2) e para o <strong>WhatsApp
 Web</strong> (Chrome, Edge, Brave e outros navegadores baseados em
@@ -484,6 +484,22 @@ recuperação por segundo</strong>: nunca entra em laço.</li>
 <p>Também ajuda no seguinte: depois do Alt+Tab as mensagens ficam sem
 nome no WhatsApp; o add-on lê o texto das partes da mensagem quando o
 nome vem vazio.</p>
+<h2 id="o-que-mudou-na-205-o-menu-para-na-última-opção">O que mudou na
+2.0.5 (o menu para na última opção)</h2>
+<p>Relato do Leo (30/10/2026), no aplicativo e no Web: abrindo o menu da
+mensagem e descendo com a seta, ao chegar no fim o foco ia para a
+mensagem de baixo ou de cima. O log do NVDA mostrou a causa: na última
+opção o add-on dava a volta e levava o foco à primeira, e logo em
+seguida o WhatsApp fechava o menu.</p>
+<ol type="1">
+<li><strong>O menu para nas pontas</strong>: seta para baixo na última
+opção fica nela e repete o nome dela. Não há mais volta para o
+início.</li>
+<li>Seta para cima na primeira opção continua indo para a barra de
+reações; seta para cima na barra fica na barra (repete a reação).</li>
+<li>Num menu sem barra de reações, seta para cima na primeira opção fica
+nela.</li>
+</ol>
 <h2 id="o-que-mudou-na-204-esc-de-costume-sem-limite-de-tempo">O que
 mudou na 2.0.4 (Esc de costume sem limite de tempo)</h2>
 <p>O Leo confirmou o jeito dele (30/10/2026): abre o menu com
@@ -537,11 +553,11 @@ depois de o menu abrir (antes de qualquer seta; sem limite de tempo
 desde a 2.0.4), ele não fecha o menu, só repete a opção em foco. O Esc
 seguinte fecha.</li>
 <li><strong>Setas presas ao menu</strong>: para baixo e para cima andam
-só pelas opções, voltando ao início no fim. Seta para cima na primeira
-opção volta à barra de reações (Esquerda e Direita andam entre as
-reações); seta para baixo na barra volta às opções. Se por algum motivo
-o foco cair num menu em modo de navegação, o Web volta sozinho ao modo
-foco.</li>
+só pelas opções e param na última e na primeira (desde a 2.0.5 não dão
+mais a volta). Seta para cima na primeira opção volta à barra de reações
+(Esquerda e Direita andam entre as reações); seta para baixo na barra
+volta às opções. Se por algum motivo o foco cair num menu em modo de
+navegação, o Web volta sozinho ao modo foco.</li>
 <li><strong>Mensagem reconhecida sem demora</strong>: a 2.0.2 procurava
 o campo de digitação para saber se uma linha era mensagem, e isso
 custava 400 a 600 ms por mensagem no log do Leo (e às vezes falhava,
@@ -572,11 +588,11 @@ foco à primeira opção sem falar a reação (opção nova, ligada por
 padrão).</li>
 <li><strong>Setas no menu não escorregam mais para a mensagem de
 baixo.</strong> Dentro de um menu, em modo foco, seta para baixo e para
-cima andam só pelas opções (voltando ao início no fim). Seta para cima
-na primeira opção vai para as reações. Se o WhatsApp não aceitar o foco
-na opção, o add-on fala a opção e o Enter a ativa (como a 1.4 fazia no
-aplicativo). Em modo de navegação e em campo de texto as setas continuam
-do NVDA.</li>
+cima andam só pelas opções (até a 2.0.4 davam a volta no fim; na 2.0.5
+param na última). Seta para cima na primeira opção vai para as reações.
+Se o WhatsApp não aceitar o foco na opção, o add-on fala a opção e o
+Enter a ativa (como a 1.4 fazia no aplicativo). Em modo de navegação e
+em campo de texto as setas continuam do NVDA.</li>
 <li><strong>Esc nativo de novo no Web</strong> (seção do modo
 foco).</li>
 <li><strong>Espaço, tecla Aplicativos e F10 contam como teclas que mudam
@@ -803,7 +819,7 @@ são toleradas.</p>
 └── build.sh           gera o .nvda-addon</code></pre>
 <pre><code>python3 -m pytest tests                  # testes com o NVDA simulado
 python3 tests/check_nvda_api.py          # confere cada API contra o código-fonte do NVDA 2026.2
-./build.sh                               # gera whatsAppUnified-2.0.4.nvda-addon</code></pre>
+./build.sh                               # gera whatsAppUnified-2.0.5.nvda-addon</code></pre>
 <p>Os stubs de <code>tests/stubs/</code> reproduzem fielmente o trecho
 de <code>browseMode.py</code> que decide o modo e toca o som; o teste de
 controle prova que, sem o add-on, o som toca no mesmo percurso de
@@ -835,6 +851,6 @@ de áudio, documentação em português, a reescrita 2.0.</li>
 </ol>
 <p>O código do NVDA 2026.2 (NV Access, GPL-2) foi a referência de cada
 API usada.</p>
-<p>Versão atual: <strong>2.0.4</strong>.</p>
+<p>Versão atual: <strong>2.0.5</strong>.</p>
 </body>
 </html>
