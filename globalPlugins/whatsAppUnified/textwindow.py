@@ -1,5 +1,7 @@
 # -*- coding: UTF-8 -*-
-"""Interface visual: janela de texto para leitura de mensagens."""
+"""Janela de texto acessível para ler uma mensagem inteira (Alt+C).
+
+Vem da 1.x (appModules/wa_ui.py), sem mudanças de comportamento."""
 
 import wx
 import gui
