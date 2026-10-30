@@ -84,7 +84,8 @@ def open_and_land(plugin, page):
 
 
 def after_grace(monkeypatch):
-	monkeypatch.setattr(menu, "_now", lambda: 10.0 ** 9)
+	"""O Esc de costume ja foi usado: o proximo Esc fecha o menu."""
+	monkeypatch.setattr(menu._Menu, "habit_esc", False)
 
 
 # ─── abrir: da barra de reacoes para as opcoes ──────────────────────────────
@@ -230,6 +231,29 @@ def test_habit_escape_right_after_opening_keeps_the_menu_open(plugin):
 	assert speech.spoken[spoken:] and speech.spoken[-1][1] is items[0]  # repete a opcao
 	script, gesture = press(plugin, "escape")
 	assert gesture.sent == 1  # o segundo Esc fecha
+
+
+def test_habit_escape_has_no_time_limit(plugin):
+	"""2.0.4: o Leo aperta Espaco e depois Esc em sequencia; so a ordem das teclas conta, nao o tempo."""
+	page = real_page()
+	bar, reactions, options_menu, items = open_and_land(plugin, page)
+	script, gesture = press(plugin, "escape")
+	assert gesture.sent == 0
+	script, gesture = press(plugin, "escape")
+	assert gesture.sent == 1
+
+
+def test_after_the_menu_closes_escape_is_native_again(plugin):
+	"""Depois de fechado, o Esc seguinte e o de sempre (volta para a lista de conversas)."""
+	page = real_page()
+	bar, reactions, options_menu, items = open_and_land(plugin, page)
+	press(plugin, "escape")  # costume
+	press(plugin, "escape")  # fecha
+	page.doc.remove(bar)
+	page.doc.remove(options_menu)
+	start_on_message(plugin, page)
+	assert menu.active() is None
+	assert plugin.getScript(Gesture("escape")) is None
 
 
 def test_habit_escape_while_still_on_the_bar_is_swallowed(plugin):

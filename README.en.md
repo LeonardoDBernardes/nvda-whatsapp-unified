@@ -1,4 +1,4 @@
-# WhatsApp Unified 2.0.3 — WhatsApp accessibility for NVDA
+# WhatsApp Unified 2.0.4 — WhatsApp accessibility for NVDA
 
 NVDA add-on for **WhatsApp Desktop** (the Microsoft Store app, which uses WebView2) and for **WhatsApp Web** (Chrome, Edge, Brave and other Chromium-based browsers).
 
@@ -107,6 +107,14 @@ WhatsApp mounts and unmounts rows as you scroll (the lists are virtualized). Whe
 
 It also helps with this: after Alt+Tab, messages lose their names in WhatsApp; the add-on reads the text of the message parts when the name comes back empty.
 
+## What changed in 2.0.4 (habit Esc without a time limit)
+
+Leo confirmed his way of working (30/10/2026): he opens the menu with **Space then Esc**, one key after the other; the **second Esc** closes the menu; with the menu closed, **one more Esc** goes back to the chat list. In 2.0.3 the first Esc only stayed in the menu if it came within 1.5 seconds, so someone pressing the keys calmly could have the menu closed right away.
+
+1. The first Esc after the menu opens, before any arrow, **never** closes the menu, however long it takes: it only repeats the focused option.
+2. The next Esc closes the menu (no sound). After an arrow, the first Esc already closes it.
+3. With the menu closed, Esc is the usual one again.
+
 ## What changed in 2.0.3 (message menu no longer escapes, Esc without sound)
 
 Leo's reports on 2.0.2 (30/10/2026): "walking the message menu with the arrows, it escapes to the message below or above", "on the Web, Space and Esc throw me to the reactions and one more Esc opens the menu" and "Esc in the menu makes the NVDA+Space sound". Both the app and the Web.
@@ -120,7 +128,7 @@ Leo's reports on 2.0.2 (30/10/2026): "walking the message menu with the arrows, 
 
 1. **Space opens straight on the options.** When focus lands on the reaction bar, the add-on sends WhatsApp's Tab and focus reaches the first option, without speaking the reaction. No Esc is needed after Space any more.
 2. **Esc inside a WhatsApp menu goes to WhatsApp**: it closes the menu and returns to the message, **with no sound and no browse mode**, on the Web and in the app. (NVDA already does this for menu items on web pages; the add-on extends the rule to the reaction bar and the message menu.)
-3. **"Space then Esc" habit**: an Esc right after the menu opens (within 1.5 seconds and before any arrow) does not close the menu; it repeats the focused option. The next Esc closes it.
+3. **"Space then Esc" habit**: an Esc right after the menu opens (before any arrow; no time limit since 2.0.4) does not close the menu; it repeats the focused option. The next Esc closes it.
 4. **Arrows stay in the menu**: down and up walk only the options, wrapping at the end. Up on the first option goes back to the reaction bar (Left and Right walk the reactions); down on the bar returns to the options. If focus ever lands on a menu in browse mode, the Web returns to focus mode by itself.
 5. **Messages recognised without delay**: 2.0.2 searched for the message field to tell whether a row was a message, which cost 400 to 600 ms per message in Leo's log (and sometimes failed, leaving the message commands inactive). Now a few parent steps suffice: the chat list has a name, the message pane is the block that takes focus.
 6. **Menu diagnostics**: with logging on, lines `menu-entrou` (with the role chain, never text), `menu-barra-para-opcoes`, `menu-seta`, `menu-esc`, `menu-esc-costume`, `menu-saiu` and `linha tipo=...` appear. If the menu still escapes, the log shows where and why.
@@ -234,7 +242,7 @@ whatsapp-unified/
 ```
 python3 -m pytest tests                  # tests with a simulated NVDA
 python3 tests/check_nvda_api.py          # checks every API against the NVDA 2026.2 source
-./build.sh                               # builds whatsAppUnified-2.0.3.nvda-addon
+./build.sh                               # builds whatsAppUnified-2.0.4.nvda-addon
 ```
 
 The stubs in `tests/stubs/` faithfully reproduce the part of `browseMode.py` that decides the mode and plays the sound; the control test proves that, without the add-on, the sound plays over the same focus path.
@@ -251,4 +259,4 @@ This add-on is **GPL version 2** (`COPYING` file). It was born from the union of
 
 The NVDA 2026.2 code (NV Access, GPL-2) was the reference for every API used.
 
-Current version: **2.0.3**.
+Current version: **2.0.4**.
