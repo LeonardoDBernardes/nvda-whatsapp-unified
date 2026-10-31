@@ -1,4 +1,4 @@
-# WhatsApp Unificado 2.0.9 — acessibilidade do WhatsApp para o NVDA
+# WhatsApp Unificado 2.0.10 — acessibilidade do WhatsApp para o NVDA
 
 Add-on do NVDA para o **WhatsApp Desktop** (o aplicativo da Microsoft Store, que usa WebView2) e para o **WhatsApp Web** (Chrome, Edge, Brave e outros navegadores baseados em Chromium).
 
@@ -107,6 +107,17 @@ O WhatsApp monta e desmonta linhas à medida que você rola (as listas são virt
 4. Se não achar nada, fala o foco original. No máximo **uma recuperação por segundo**: nunca entra em laço.
 
 Também ajuda no seguinte: depois do Alt+Tab as mensagens ficam sem nome no WhatsApp; o add-on lê o texto das partes da mensagem quando o nome vem vazio.
+
+## O que mudou na 2.0.10 (menu da mensagem não foge mais no Web)
+
+Relato do Leo (31/10/2026): no Web, descendo pelas opções do menu da mensagem, o foco escorregava para a mensagem de baixo. No aplicativo o menu para na última opção, como deve.
+
+Por quê (conferido no log da 2.0.9 e no código do NVDA 2026.2): o menu tinha 10 opções e fechava sempre ao ir para a 6ª. É a primeira opção que não cabe na parte visível do menu, então o WhatsApp rola a lista do menu para mostrá-la. O Chrome avisa o NVDA de que a página rolou, e o buffer do NVDA leva o cursor para o ponto rolado. Em modo foco o NVDA ainda põe o foco no objeto desse ponto, que era a mensagem atrás do menu, e isso fecha o menu. No aplicativo não existe esse buffer, por isso lá não acontecia.
+
+1. **No Web, em modo foco, a rolagem da página não move mais o cursor nem o foco**: quem anda é o WhatsApp, como no aplicativo. O menu só sai com o Esc e para na última opção.
+2. Em modo de navegação (NVDA+Espaço) a rolagem continua sendo do NVDA.
+3. O diagnóstico registra `rolagem-ignorada` cada vez que isso acontece.
+4. **O aplicativo não muda**: a mudança é só no buffer do Web.
 
 ## O que mudou na 2.0.9 (Esc no Web igual ao aplicativo)
 
@@ -287,7 +298,7 @@ whatsapp-unified/
 ```
 python3 -m pytest tests                  # testes com o NVDA simulado
 python3 tests/check_nvda_api.py          # confere cada API contra o código-fonte do NVDA 2026.2
-./build.sh                               # gera whatsAppUnified-2.0.9.nvda-addon
+./build.sh                               # gera whatsAppUnified-2.0.10.nvda-addon
 ```
 
 Os stubs de `tests/stubs/` reproduzem fielmente o trecho de `browseMode.py` que decide o modo e toca o som; o teste de controle prova que, sem o add-on, o som toca no mesmo percurso de foco.
@@ -304,4 +315,4 @@ Este add-on é **GPL versão 2** (arquivo `COPYING`). Ele nasceu da união de do
 
 O código do NVDA 2026.2 (NV Access, GPL-2) foi a referência de cada API usada.
 
-Versão atual: **2.0.9**.
+Versão atual: **2.0.10**.

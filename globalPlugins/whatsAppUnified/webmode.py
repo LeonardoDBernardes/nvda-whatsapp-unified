@@ -39,6 +39,9 @@ o Ctrl+setas lê a mensagem por palavra em modo foco. O modo de navegação
 continua no NVDA+Espaço. Dentro de um menu do WhatsApp o plugin global pega o
 Esc antes do buffer (2.0.3, ver menu.py).
 
+ROLAGEM (2.0.10): com a trava ligada a rolagem da página não move o cursor nem o
+foco (``event_scrollingStart``); antes ela tirava o foco do menu da mensagem.
+
 O QUE CONTINUA NATIVO:
 - NVDA+Espaço alterna normalmente e toca o som, porque o ``.last`` está
   sincronizado com o modo anterior. Em modo de navegação escolhido assim a
@@ -265,6 +268,32 @@ class WhatsAppChromeVBuf(ChromeVBuf):
 		super().script_disablePassThrough(gesture)
 
 	script_disablePassThrough.ignoreTreeInterceptorPassThrough = True
+
+	def event_scrollingStart(self, obj, nextHandler):
+		"""Rolagem da página em modo foco travado: o cursor e o foco ficam onde estão (2.0.10).
+
+		Relato do Leo (31/10/2026): descendo pelas opções do menu da mensagem, no
+		Web o foco escorregava para a mensagem de baixo, sempre na 6ª opção de 10.
+		Causa, no código do NVDA 2026.2: a opção que entra na tela faz o WhatsApp
+		rolar a lista do menu; o Chrome avisa "rolou" e o buffer
+		(``gecko_ia2.event_scrollingStart`` → ``_handleScrollTo``) leva o cursor
+		para o ponto rolado. Em modo foco, ``_set_selection`` então chama
+		``setFocus`` no objeto focável desse ponto (browseMode.py:1952-1959), que
+		era a mensagem atrás do menu, e o menu fechava. No aplicativo não há
+		buffer, por isso lá não acontece. Com a trava ligada quem anda é o
+		WhatsApp, então a rolagem não move nada. Em modo de navegação (NVDA+Espaço)
+		a rolagem segue o NVDA.
+		"""
+		if self._wa_pinned and self.passThrough and self.isReady:
+			try:
+				where = diag.describe(obj)
+			except Exception:
+				where = "?"
+			diag.act("rolagem-ignorada", "menu=%s %s" % (menu.active() is not None, where))
+			return nextHandler()
+		super().event_scrollingStart(obj, nextHandler)
+
+	event_scrollingStart.ignoreIsReady = True
 
 	# ─── pontos onde o NVDA compara com ``reportPassThrough.last`` ──────────
 

@@ -51,7 +51,7 @@ INSTANCE_ATTRS = {
 		"rootNVDAObject", "documentConstantIdentifier", "documentURL", "passThrough",
 		"disableAutoPassThrough", "_disableAutoPassThrough", "_passThrough",
 		"shouldPassThrough", "event_treeInterceptor_gainFocus", "event_gainFocus",
-		"script_disablePassThrough", "isReady",
+		"script_disablePassThrough", "isReady", "event_scrollingStart",
 	],
 	("appModuleHandler", "AppModule"): [
 		"appName", "chooseNVDAObjectOverlayClasses", "getScript",

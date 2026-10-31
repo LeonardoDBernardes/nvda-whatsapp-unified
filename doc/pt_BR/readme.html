@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>WhatsApp Unificado 2.0.9</title>
+  <title>WhatsApp Unificado 2.0.10</title>
   <style>
     html {
       color: #1a1a1a;
@@ -166,11 +166,11 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">WhatsApp Unificado 2.0.9</h1>
+<h1 class="title">WhatsApp Unificado 2.0.10</h1>
 </header>
 <h1
-id="whatsapp-unificado-209--acessibilidade-do-whatsapp-para-o-nvda">WhatsApp
-Unificado 2.0.9 — acessibilidade do WhatsApp para o NVDA</h1>
+id="whatsapp-unificado-2010--acessibilidade-do-whatsapp-para-o-nvda">WhatsApp
+Unificado 2.0.10 — acessibilidade do WhatsApp para o NVDA</h1>
 <p>Add-on do NVDA para o <strong>WhatsApp Desktop</strong> (o aplicativo
 da Microsoft Store, que usa WebView2) e para o <strong>WhatsApp
 Web</strong> (Chrome, Edge, Brave e outros navegadores baseados em
@@ -493,6 +493,30 @@ recuperação por segundo</strong>: nunca entra em laço.</li>
 <p>Também ajuda no seguinte: depois do Alt+Tab as mensagens ficam sem
 nome no WhatsApp; o add-on lê o texto das partes da mensagem quando o
 nome vem vazio.</p>
+<h2 id="o-que-mudou-na-2010-menu-da-mensagem-não-foge-mais-no-web">O que
+mudou na 2.0.10 (menu da mensagem não foge mais no Web)</h2>
+<p>Relato do Leo (31/10/2026): no Web, descendo pelas opções do menu da
+mensagem, o foco escorregava para a mensagem de baixo. No aplicativo o
+menu para na última opção, como deve.</p>
+<p>Por quê (conferido no log da 2.0.9 e no código do NVDA 2026.2): o
+menu tinha 10 opções e fechava sempre ao ir para a 6ª. É a primeira
+opção que não cabe na parte visível do menu, então o WhatsApp rola a
+lista do menu para mostrá-la. O Chrome avisa o NVDA de que a página
+rolou, e o buffer do NVDA leva o cursor para o ponto rolado. Em modo
+foco o NVDA ainda põe o foco no objeto desse ponto, que era a mensagem
+atrás do menu, e isso fecha o menu. No aplicativo não existe esse
+buffer, por isso lá não acontecia.</p>
+<ol type="1">
+<li><strong>No Web, em modo foco, a rolagem da página não move mais o
+cursor nem o foco</strong>: quem anda é o WhatsApp, como no aplicativo.
+O menu só sai com o Esc e para na última opção.</li>
+<li>Em modo de navegação (NVDA+Espaço) a rolagem continua sendo do
+NVDA.</li>
+<li>O diagnóstico registra <code>rolagem-ignorada</code> cada vez que
+isso acontece.</li>
+<li><strong>O aplicativo não muda</strong>: a mudança é só no buffer do
+Web.</li>
+</ol>
 <h2 id="o-que-mudou-na-209-esc-no-web-igual-ao-aplicativo">O que mudou
 na 2.0.9 (Esc no Web igual ao aplicativo)</h2>
 <p>Relato do Leo (31/10/2026): no Web, ao voltar de uma conversa com o
@@ -900,7 +924,7 @@ são toleradas.</p>
 └── build.sh           gera o .nvda-addon</code></pre>
 <pre><code>python3 -m pytest tests                  # testes com o NVDA simulado
 python3 tests/check_nvda_api.py          # confere cada API contra o código-fonte do NVDA 2026.2
-./build.sh                               # gera whatsAppUnified-2.0.9.nvda-addon</code></pre>
+./build.sh                               # gera whatsAppUnified-2.0.10.nvda-addon</code></pre>
 <p>Os stubs de <code>tests/stubs/</code> reproduzem fielmente o trecho
 de <code>browseMode.py</code> que decide o modo e toca o som; o teste de
 controle prova que, sem o add-on, o som toca no mesmo percurso de
@@ -932,6 +956,6 @@ de áudio, documentação em português, a reescrita 2.0.</li>
 </ol>
 <p>O código do NVDA 2026.2 (NV Access, GPL-2) foi a referência de cada
 API usada.</p>
-<p>Versão atual: <strong>2.0.9</strong>.</p>
+<p>Versão atual: <strong>2.0.10</strong>.</p>
 </body>
 </html>

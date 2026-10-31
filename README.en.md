@@ -1,4 +1,4 @@
-# WhatsApp Unified 2.0.9 — WhatsApp accessibility for NVDA
+# WhatsApp Unified 2.0.10 — WhatsApp accessibility for NVDA
 
 NVDA add-on for **WhatsApp Desktop** (the Microsoft Store app, which uses WebView2) and for **WhatsApp Web** (Chrome, Edge, Brave and other Chromium-based browsers).
 
@@ -107,6 +107,17 @@ WhatsApp mounts and unmounts rows as you scroll (the lists are virtualized). Whe
 4. If it finds nothing, it speaks the original focus. At most **one recovery per second**: it never loops.
 
 It also helps with this: after Alt+Tab, messages lose their names in WhatsApp; the add-on reads the text of the message parts when the name comes back empty.
+
+## What changed in 2.0.10 (the message menu no longer escapes on the Web)
+
+Leo's report (31/10/2026): on the Web, going down the message menu options, focus slipped to the message below. In the app the menu stops at the last option, as it should.
+
+Why (checked in the 2.0.9 log and in the NVDA 2026.2 source): the menu had 10 options and always closed when going to the 6th. It is the first option that does not fit in the visible part of the menu, so WhatsApp scrolls the menu list to show it. Chrome tells NVDA the page scrolled, and the NVDA buffer moves its cursor to the scrolled point. In focus mode NVDA then also puts the focus on the object at that point, which was the message behind the menu, and that closes the menu. The app has no such buffer, so it never happened there.
+
+1. **On the Web, in focus mode, page scrolling no longer moves the cursor or the focus**: WhatsApp does the moving, as in the app. The menu is left only with Esc and stops at the last option.
+2. In browse mode (NVDA+Space) scrolling is still NVDA's.
+3. The diagnostics log `rolagem-ignorada` each time this happens.
+4. **The app does not change**: the change is only in the Web buffer.
 
 ## What changed in 2.0.9 (Esc on the Web like the app)
 
@@ -287,7 +298,7 @@ whatsapp-unified/
 ```
 python3 -m pytest tests                  # tests with a simulated NVDA
 python3 tests/check_nvda_api.py          # checks every API against the NVDA 2026.2 source
-./build.sh                               # builds whatsAppUnified-2.0.9.nvda-addon
+./build.sh                               # builds whatsAppUnified-2.0.10.nvda-addon
 ```
 
 The stubs in `tests/stubs/` faithfully reproduce the part of `browseMode.py` that decides the mode and plays the sound; the control test proves that, without the add-on, the sound plays over the same focus path.
@@ -304,4 +315,4 @@ This add-on is **GPL version 2** (`COPYING` file). It was born from the union of
 
 The NVDA 2026.2 code (NV Access, GPL-2) was the reference for every API used.
 
-Current version: **2.0.9**.
+Current version: **2.0.10**.
