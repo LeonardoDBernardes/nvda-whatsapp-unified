@@ -70,6 +70,22 @@ opções, ele muda para a mensagem de baixo"; no Web, em Denunciar):
   não ficou completa no prazo, a seta vai para o WhatsApp na dúvida;
 - o log diz em que opção cada seta estava ("menu-seta baixo 9/11"), para achar
   onde o menu fecha se ainda fechar.
+2.0.11 (relato do Leo, 31/10/2026: no Web, descendo pelas opções, o foco ainda
+foge para a mensagem de baixo, sempre na 6ª opção de 10; no aplicativo não):
+- CAUSA (código da página, useWDSMenu): com o menu aberto o WhatsApp escuta
+  QUALQUER rolagem da página e fecha o menu se o que rolou está fora dele. O
+  menu de opções pode ter até 360 pixels e passa da borda de baixo da janela
+  do Chrome; a primeira opção que fica fora da parte visível, ao ganhar o
+  foco, faz o Chrome rolar a página para mostrá-la, e o menu fecha. No
+  aplicativo a janela cabe o menu inteiro. (A 2.0.10 culpou a rolagem do
+  buffer do NVDA; o log mostrou que não era e ela foi desfeita.)
+- AGORA, só no Web: se a próxima opção está fora da parte visível (estado
+  "fora da tela" do Chrome, ou posição fora do documento ou cortada), a seta
+  não vai ao WhatsApp. O foco fica na última opção visível e o add-on fala a
+  opção seguinte ("navegação virtual"); Enter ou Espaço ativam a opção falada;
+  seta para baixo na última fica nela; seta para cima volta, e ao chegar à
+  opção com o foco a navegação virtual acaba. Esc fecha o menu como antes.
+  Opções visíveis continuam com a seta do próprio WhatsApp.
 """
 
 import api
@@ -77,8 +93,8 @@ import core
 import speech
 from controlTypes import OutputReason
 
-from . import diag, settings
-from .tree import Role, State, iter_children, safe_role, safe_states, walk, walk_all
+from . import context, diag, settings
+from .tree import Role, State, document_root, iter_children, safe_role, safe_states, walk, walk_all
 
 MENU_ROLES = frozenset((Role.POPUPMENU, Role.MENU))
 MENU_ITEM_ROLES = frozenset(
@@ -97,6 +113,8 @@ CHECK_DELAY_MS = 300
 TRAY_DELAY_MS = 150  # a barra de reações acabou de abrir: espera o WhatsApp assentar antes do Tab
 # Botões da barra de reações (as reações têm ``aria-pressed``: botão de alternar).
 TRAY_BUTTON_ROLES = frozenset(r for r in (Role.BUTTON, Role.TOGGLEBUTTON) if r is not None)
+_OFFSCREEN = getattr(State, "OFFSCREEN", None)
+CLIP_SLACK = 2  # pixels: opção mais baixa que a do foco por mais que isto está cortada pela borda
 
 
 class _Menu:
@@ -104,6 +122,8 @@ class _Menu:
 	tray = False  # o contêiner é a barra de reações (pop-up separado, só botões)
 	tray_seen = False  # a barra de reações apareceu desde que o menu abriu
 	habit_esc = False  # o add-on levou o foco às opções e nenhuma tecla do menu veio ainda
+	virtual = None  # Web: opção fora da tela que a seta falou (o foco ficou em ``virtual_from``)
+	virtual_from = None
 
 
 def reset():
@@ -111,6 +131,35 @@ def reset():
 	_Menu.tray = False
 	_Menu.tray_seen = False
 	_Menu.habit_esc = False
+	_stop_virtual()
+
+
+def _stop_virtual():
+	_Menu.virtual = None
+	_Menu.virtual_from = None
+
+
+def _virtual_item(focus):
+	"""A opção da navegação virtual, se o foco ainda é o de quando ela começou; senão None."""
+	if _Menu.virtual is None:
+		return None
+	try:
+		same = focus is not None and focus == _Menu.virtual_from
+	except Exception:
+		same = False
+	if not same:
+		_stop_virtual()
+		return None
+	return _Menu.virtual
+
+
+def virtual_item():
+	"""A opção fora da tela que a seta falou no Web (Enter e Espaço a ativam), ou None."""
+	try:
+		focus = api.getFocusObject()
+	except Exception:
+		return None
+	return _virtual_item(focus)
 
 
 def in_tray():
@@ -268,12 +317,103 @@ def _send(name):
 	KeyboardInputGesture.fromName(name).send()
 
 
+def _rect(obj):
+	"""Posição (esquerda, topo, largura, altura) do objeto na tela, ou None."""
+	try:
+		rect = obj.location
+	except Exception:
+		return None
+	if not rect:
+		return None
+	try:
+		left, top, width, height = rect
+	except Exception:
+		return None
+	return left, top, width, height
+
+
+def _fully_visible(obj, focus):
+	"""A opção cabe inteira na parte visível da página?
+
+	O Chrome marca "fora da tela" o que está fora da janela ou escondido por um
+	contêiner que corta o conteúdo, e encolhe a posição da parte escondida. Sem
+	posição conhecida a resposta é sim: a seta vai ao WhatsApp, como antes.
+	"""
+	if _OFFSCREEN is not None and _OFFSCREEN in safe_states(obj):
+		return False
+	rect = _rect(obj)
+	if rect is None:
+		return True
+	_, top, _, height = rect
+	if height <= 0:
+		return False
+	view = _rect(document_root(focus))
+	if view is not None:
+		_, view_top, _, view_height = view
+		if top < view_top or top + height > view_top + view_height:
+			return False
+	current = _rect(focus)
+	if current is not None and height + CLIP_SLACK < current[3]:
+		return False
+	return True
+
+
+def _speak(obj):
+	try:
+		speech.cancelSpeech()
+		speech.speakObject(obj, reason=OutputReason.FOCUS)
+	except Exception:
+		pass
+
+
+def _move_virtual(direction, focus, items, index):
+	"""Seta na navegação virtual (Web): fala a opção vizinha sem mover o foco."""
+	if index < 0:  # a opção sumiu da lista: volta para onde o foco está
+		_stop_virtual()
+		_speak(focus)
+		return
+	target_index = index + direction
+	if not 0 <= target_index < len(items):
+		_at_edge(items[index])
+		return
+	target = items[target_index]
+	try:
+		back = target == focus
+	except Exception:
+		back = False
+	if back:
+		diag.act("menu-virtual-fim", "%d/%d" % (target_index + 1, len(items)))
+		_stop_virtual()
+		_speak(focus)
+		return
+	_Menu.virtual = target
+	diag.act("menu-virtual", "%d/%d" % (target_index + 1, len(items)), key="menu-virtual:%d" % target_index)
+	_speak(target)
+
+
+def activate(gesture):
+	"""Enter ou Espaço na opção falada pela navegação virtual: ativa essa opção (Web)."""
+	item = virtual_item()
+	_stop_virtual()
+	if item is None:
+		gesture.send()
+		return
+	diag.act("menu-virtual-ativar", "")
+	try:
+		item.doAction()
+	except Exception:
+		# Nunca mandar a tecla: ela ativaria a opção onde o foco está, não a falada.
+		diag.act("menu-virtual-falhou", "")
+
+
 def move(direction, gesture):
 	"""Seta para baixo (1) ou para cima (-1) num menu do WhatsApp.
 
 	Quem anda pelas opções é o próprio WhatsApp (a seta segue para ele); o
 	add-on só age nas pontas, para o menu não dar a volta, e na ida e volta
-	entre as opções e a barra de reações.
+	entre as opções e a barra de reações. No Web, opção fora da parte visível
+	é só falada (navegação virtual, 2.0.11): o foco nela faria o WhatsApp
+	fechar o menu.
 	"""
 	_Menu.habit_esc = False  # o usuário já anda pelo menu: o próximo Esc fecha
 	if _Menu.tray:
@@ -288,12 +428,27 @@ def move(direction, gesture):
 	container = _Menu.container
 	focus = api.getFocusObject()
 	items, complete = items_state(container)
-	index = _index(items, focus)
+	virtual = _virtual_item(focus)
+	index = _index(items, virtual if virtual is not None else focus)
+	hidden = False
+	where = ""  # no Web o log diz se a próxima opção cabe na janela
+	if virtual is None and context.active() == "web" and 0 <= index + direction < len(items) and index >= 0:
+		hidden = not _fully_visible(items[index + direction], focus)
+		where = " proxima=fora" if hidden else " proxima=dentro"
 	diag.act(
 		"menu-seta",
-		"%s %d/%d%s" % ("baixo" if direction > 0 else "cima", index + 1, len(items), "" if complete else "+"),
+		"%s %d/%d%s%s" % (
+			"baixo" if direction > 0 else "cima",
+			index + 1,
+			len(items),
+			"" if complete else "+",
+			" virtual" if virtual is not None else where,
+		),
 		key="menu-seta:%d:%d" % (direction, index),
 	)
+	if virtual is not None:
+		_move_virtual(direction, focus, items, index)
+		return
 	if direction < 0 and index == 0:
 		reaction = tray_first(container, items)
 		if reaction is not None:  # menu antigo: a fileira de reações fica dentro dele
@@ -310,6 +465,10 @@ def move(direction, gesture):
 		return
 	if direction > 0 and complete and items and index == len(items) - 1:
 		_at_edge(focus)
+		return
+	if hidden:
+		_Menu.virtual_from = focus
+		_move_virtual(direction, focus, items, index)
 		return
 	gesture.send()
 
@@ -332,6 +491,7 @@ def escape(gesture):
 	"""
 	habit = _Menu.habit_esc
 	_Menu.habit_esc = False
+	_stop_virtual()
 	if habit:
 		diag.act("menu-esc-costume", "")
 		if not _Menu.tray:  # na barra, a opção ainda vai ser falada quando o foco chegar
@@ -378,6 +538,7 @@ def handle_gain_focus(obj, nextHandler):
 	a reação. Devolve True se tratou o evento (não chame ``nextHandler`` de novo).
 	"""
 	previous = _Menu.container
+	_virtual_item(obj)  # o foco andou: a navegação virtual acaba
 	container = container_of(obj)
 	_Menu.container = container
 	if container is None:

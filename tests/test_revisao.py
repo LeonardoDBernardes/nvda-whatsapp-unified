@@ -396,6 +396,6 @@ def test_click_between_the_event_and_the_check_cancels_the_recovery(plugin, cloc
 def test_manifest_versions():
 	with open(os.path.join(ROOT, "manifest.ini"), encoding="utf-8") as handle:
 		text = handle.read()
-	assert "version = 2.0.10" in text
+	assert "version = 2.0.11" in text
 	assert "minimumNVDAVersion = 2026.1" in text
 	assert "lastTestedNVDAVersion = 2026.2" in text

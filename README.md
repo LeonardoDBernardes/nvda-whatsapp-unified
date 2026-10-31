@@ -1,4 +1,4 @@
-# WhatsApp Unificado 2.0.10 — acessibilidade do WhatsApp para o NVDA
+# WhatsApp Unificado 2.0.11 — acessibilidade do WhatsApp para o NVDA
 
 Add-on do NVDA para o **WhatsApp Desktop** (o aplicativo da Microsoft Store, que usa WebView2) e para o **WhatsApp Web** (Chrome, Edge, Brave e outros navegadores baseados em Chromium).
 
@@ -108,16 +108,18 @@ O WhatsApp monta e desmonta linhas à medida que você rola (as listas são virt
 
 Também ajuda no seguinte: depois do Alt+Tab as mensagens ficam sem nome no WhatsApp; o add-on lê o texto das partes da mensagem quando o nome vem vazio.
 
-## O que mudou na 2.0.10 (menu da mensagem não foge mais no Web)
+## O que mudou na 2.0.11 (menu da mensagem não foge mais no Web)
 
-Relato do Leo (31/10/2026): no Web, descendo pelas opções do menu da mensagem, o foco escorregava para a mensagem de baixo. No aplicativo o menu para na última opção, como deve.
+Relato do Leo (31/10/2026): no Web, descendo pelas opções do menu da mensagem, o foco escorregava para a mensagem de baixo, sempre na 6ª opção de 10. No aplicativo o menu para na última opção, como deve. A 2.0.10 tentou corrigir culpando a rolagem do buffer do NVDA; o log mostrou que não era isso, e aquela mudança foi desfeita.
 
-Por quê (conferido no log da 2.0.9 e no código do NVDA 2026.2): o menu tinha 10 opções e fechava sempre ao ir para a 6ª. É a primeira opção que não cabe na parte visível do menu, então o WhatsApp rola a lista do menu para mostrá-la. O Chrome avisa o NVDA de que a página rolou, e o buffer do NVDA leva o cursor para o ponto rolado. Em modo foco o NVDA ainda põe o foco no objeto desse ponto, que era a mensagem atrás do menu, e isso fecha o menu. No aplicativo não existe esse buffer, por isso lá não acontecia.
+Por quê (código da página do WhatsApp): com o menu aberto, o WhatsApp fecha o menu sempre que alguma coisa fora dele rola na página. O menu de opções é alto e passa da borda de baixo da janela do Chrome: na tela do Leo, da 6ª opção em diante ficam fora da parte visível. Quando a 6ª ganha o foco, o Chrome rola a página para mostrá-la, e o WhatsApp fecha o menu; o foco volta para a mensagem. No aplicativo a janela cabe o menu inteiro, por isso lá não acontece.
 
-1. **No Web, em modo foco, a rolagem da página não move mais o cursor nem o foco**: quem anda é o WhatsApp, como no aplicativo. O menu só sai com o Esc e para na última opção.
-2. Em modo de navegação (NVDA+Espaço) a rolagem continua sendo do NVDA.
-3. O diagnóstico registra `rolagem-ignorada` cada vez que isso acontece.
-4. **O aplicativo não muda**: a mudança é só no buffer do Web.
+1. **Só no Web: opção fora da parte visível da janela é falada sem levar o foco até ela.** A seta não vai para o WhatsApp, então nada rola e o menu fica aberto. O foco continua na última opção visível.
+2. **Enter ou Espaço ativam a opção falada.**
+3. Seta para baixo na última opção fica nela; seta para cima volta pelas opções, e ao chegar à que tem o foco tudo volta ao normal. **Esc fecha o menu** como antes.
+4. As opções que cabem na janela continuam com a seta do próprio WhatsApp, como na 2.0.9.
+5. O diagnóstico diz, a cada seta no Web, se a próxima opção estava dentro ou fora da janela (`proxima=dentro` ou `proxima=fora`), e registra `menu-virtual` e `menu-virtual-ativar`.
+6. **O aplicativo não muda.**
 
 ## O que mudou na 2.0.9 (Esc no Web igual ao aplicativo)
 
@@ -298,7 +300,7 @@ whatsapp-unified/
 ```
 python3 -m pytest tests                  # testes com o NVDA simulado
 python3 tests/check_nvda_api.py          # confere cada API contra o código-fonte do NVDA 2026.2
-./build.sh                               # gera whatsAppUnified-2.0.10.nvda-addon
+./build.sh                               # gera whatsAppUnified-2.0.11.nvda-addon
 ```
 
 Os stubs de `tests/stubs/` reproduzem fielmente o trecho de `browseMode.py` que decide o modo e toca o som; o teste de controle prova que, sem o add-on, o som toca no mesmo percurso de foco.
@@ -315,4 +317,4 @@ Este add-on é **GPL versão 2** (arquivo `COPYING`). Ele nasceu da união de do
 
 O código do NVDA 2026.2 (NV Access, GPL-2) foi a referência de cada API usada.
 
-Versão atual: **2.0.10**.
+Versão atual: **2.0.11**.

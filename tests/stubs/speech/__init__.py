@@ -5,6 +5,10 @@ def reset():
 	spoken.clear()
 
 
+def cancelSpeech():
+	spoken.append(("cancel",))
+
+
 def speakObject(obj, reason=None, **kwargs):
 	spoken.append(("object", obj, reason))
 

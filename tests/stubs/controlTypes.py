@@ -50,6 +50,7 @@ class State(enum.IntEnum):
 	DEFUNCT = 9
 	INVISIBLE = 10
 	BUSY = 11
+	OFFSCREEN = 12
 
 
 class OutputReason(enum.Enum):

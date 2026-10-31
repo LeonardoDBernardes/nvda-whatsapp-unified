@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>WhatsApp Unified 2.0.10</title>
+  <title>WhatsApp Unified 2.0.11</title>
   <style>
     html {
       color: #1a1a1a;
@@ -166,10 +166,10 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">WhatsApp Unified 2.0.10</h1>
+<h1 class="title">WhatsApp Unified 2.0.11</h1>
 </header>
-<h1 id="whatsapp-unified-2010--whatsapp-accessibility-for-nvda">WhatsApp
-Unified 2.0.10 — WhatsApp accessibility for NVDA</h1>
+<h1 id="whatsapp-unified-2011--whatsapp-accessibility-for-nvda">WhatsApp
+Unified 2.0.11 — WhatsApp accessibility for NVDA</h1>
 <p>NVDA add-on for <strong>WhatsApp Desktop</strong> (the Microsoft
 Store app, which uses WebView2) and for <strong>WhatsApp Web</strong>
 (Chrome, Edge, Brave and other Chromium-based browsers).</p>
@@ -489,28 +489,36 @@ normally.</li>
 WhatsApp; the add-on reads the text of the message parts when the name
 comes back empty.</p>
 <h2
-id="what-changed-in-2010-the-message-menu-no-longer-escapes-on-the-web">What
-changed in 2.0.10 (the message menu no longer escapes on the Web)</h2>
+id="what-changed-in-2011-the-message-menu-no-longer-escapes-on-the-web">What
+changed in 2.0.11 (the message menu no longer escapes on the Web)</h2>
 <p>Leo's report (31/10/2026): on the Web, going down the message menu
-options, focus slipped to the message below. In the app the menu stops
-at the last option, as it should.</p>
-<p>Why (checked in the 2.0.9 log and in the NVDA 2026.2 source): the
-menu had 10 options and always closed when going to the 6th. It is the
-first option that does not fit in the visible part of the menu, so
-WhatsApp scrolls the menu list to show it. Chrome tells NVDA the page
-scrolled, and the NVDA buffer moves its cursor to the scrolled point. In
-focus mode NVDA then also puts the focus on the object at that point,
-which was the message behind the menu, and that closes the menu. The app
-has no such buffer, so it never happened there.</p>
+options, focus slipped to the message below, always at the 6th option of
+10. In the app the menu stops at the last option, as it should. 2.0.10
+tried to fix it by blaming the NVDA buffer's scroll handling; the log
+showed that was not it, and that change was undone.</p>
+<p>Why (WhatsApp page code): while the menu is open, WhatsApp closes it
+whenever something outside it scrolls. The options menu is tall and goes
+past the bottom edge of the Chrome window: on Leo's screen, the 6th
+option onwards is outside the visible part. When the 6th gets focus,
+Chrome scrolls the page to show it, and WhatsApp closes the menu; focus
+goes back to the message. In the app the window fits the whole menu, so
+it never happens there.</p>
 <ol type="1">
-<li><strong>On the Web, in focus mode, page scrolling no longer moves
-the cursor or the focus</strong>: WhatsApp does the moving, as in the
-app. The menu is left only with Esc and stops at the last option.</li>
-<li>In browse mode (NVDA+Space) scrolling is still NVDA's.</li>
-<li>The diagnostics log <code>rolagem-ignorada</code> each time this
-happens.</li>
-<li><strong>The app does not change</strong>: the change is only in the
-Web buffer.</li>
+<li><strong>Web only: an option outside the visible part of the window
+is spoken without moving focus to it.</strong> The arrow does not go to
+WhatsApp, so nothing scrolls and the menu stays open. Focus stays on the
+last visible option.</li>
+<li><strong>Enter or Space activate the spoken option.</strong></li>
+<li>Down arrow on the last option stays there; up arrow goes back
+through the options, and on reaching the focused one everything is back
+to normal. <strong>Esc closes the menu</strong> as before.</li>
+<li>Options that fit in the window still use WhatsApp's own arrow
+handling, as in 2.0.9.</li>
+<li>On every Web arrow the diagnostics say whether the next option was
+inside or outside the window (<code>proxima=dentro</code> or
+<code>proxima=fora</code>), and log <code>menu-virtual</code> and
+<code>menu-virtual-ativar</code>.</li>
+<li><strong>The app does not change.</strong></li>
 </ol>
 <h2 id="what-changed-in-209-esc-on-the-web-like-the-app">What changed in
 2.0.9 (Esc on the Web like the app)</h2>
@@ -914,7 +922,7 @@ tolerated.</p>
 └── build.sh           builds the .nvda-addon</code></pre>
 <pre><code>python3 -m pytest tests                  # tests with a simulated NVDA
 python3 tests/check_nvda_api.py          # checks every API against the NVDA 2026.2 source
-./build.sh                               # builds whatsAppUnified-2.0.10.nvda-addon</code></pre>
+./build.sh                               # builds whatsAppUnified-2.0.11.nvda-addon</code></pre>
 <p>The stubs in <code>tests/stubs/</code> faithfully reproduce the part
 of <code>browseMode.py</code> that decides the mode and plays the sound;
 the control test proves that, without the add-on, the sound plays over
@@ -945,6 +953,6 @@ control, Portuguese documentation, the 2.0 rewrite.</li>
 </ol>
 <p>The NVDA 2026.2 code (NV Access, GPL-2) was the reference for every
 API used.</p>
-<p>Current version: <strong>2.0.10</strong>.</p>
+<p>Current version: <strong>2.0.11</strong>.</p>
 </body>
 </html>
