@@ -7,7 +7,9 @@ aplicado, foco adiado ou recuperado, script executado, fala filtrada, modo foco
 fixado ou solto). Limites, para o log não encher:
 - no máximo uma linha por ação (e por classe, no caso de sobreposição) a cada 2 segundos;
 - gancho do add-on que demora mais de 100 ms vira uma linha "lento" (com o tempo);
-- no máximo 200 linhas por sessão do NVDA (a 201ª é só o aviso de que parou).
+- no máximo 3000 linhas por sessão do NVDA (a seguinte é só o aviso de que parou).
+  Eram 200 até a 2.0.7: o teste do Leo no Web (31/10/2026) caiu depois do
+  limite e não ficou nada registrado.
 NUNCA registra conteúdo de mensagem: só papel, nome de classe, nome do programa
 e o TAMANHO de um texto. A opção "Registrar ações no log do NVDA (diagnóstico)"
 liga e desliga isto (ligada por padrão nesta versão de teste).
@@ -22,7 +24,7 @@ from . import settings
 
 PREFIX = "WhatsAppUnificado:"
 MIN_GAP_S = 2.0
-MAX_LINES = 200
+MAX_LINES = 3000
 
 
 class _Counter:
@@ -88,6 +90,20 @@ def role_name(obj):
 	try:
 		role = obj.role
 		return str(getattr(role, "name", role))
+	except Exception:
+		return "?"
+
+
+def mode_name(obj):
+	"""Modo do NVDA no objeto: ``foco``, ``navegacao`` ou ``sem-buffer`` (aplicativo)."""
+	try:
+		holder = obj.treeInterceptor
+	except Exception:
+		return "?"
+	if holder is None:
+		return "sem-buffer"
+	try:
+		return "foco" if holder.passThrough else "navegacao"
 	except Exception:
 		return "?"
 

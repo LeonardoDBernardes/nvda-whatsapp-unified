@@ -1,4 +1,4 @@
-# WhatsApp Unified 2.0.7 — WhatsApp accessibility for NVDA
+# WhatsApp Unified 2.0.8 — WhatsApp accessibility for NVDA
 
 NVDA add-on for **WhatsApp Desktop** (the Microsoft Store app, which uses WebView2) and for **WhatsApp Web** (Chrome, Edge, Brave and other Chromium-based browsers).
 
@@ -62,7 +62,7 @@ NVDA → Preferences → Settings → **WhatsApp Unified**. They take effect imm
 | Keep focus mode automatically on WhatsApp Web, with no mode switch sound | Yes | Turns on the part described in the next section. |
 | Recover focus when WhatsApp loses it | Yes | Turns on focus recovery. |
 | Message menu starts on the options (Reply, Copy), not on the reactions | Yes | When the message menu opens, focus goes straight to the first option (the add-on uses WhatsApp's own Tab). Up arrow on the first option goes to the reactions; down arrow on the reactions returns to the options. |
-| Log add-on actions in the NVDA log (diagnostics) | Yes (in this test version) | Writes a line starting with `WhatsAppUnificado:` to the NVDA log (INFO level, open it with NVDA+F1) whenever the add-on acts: overlay applied, focus deferred or recovered, script run, speech filtered, focus mode pinned or released. At most one line per action every 2 seconds and 200 lines per session. It never records message text, only the object's role and the text length. |
+| Log add-on actions in the NVDA log (diagnostics) | Yes (in this test version) | Writes a line starting with `WhatsAppUnificado:` to the NVDA log (INFO level, open it with NVDA+F1) whenever the add-on acts: overlay applied, focus deferred or recovered, script run, speech filtered, focus mode pinned or released. At most one line per action every 2 seconds and 3000 lines per session. It never records message text, only the object's role and the text length. |
 
 The old `disableFocusLock` option (1.x) was merged into "Keep focus mode automatically". If it was on in your `nvda.ini`, 2.0 honors that until you save the new panel.
 
@@ -107,6 +107,17 @@ WhatsApp mounts and unmounts rows as you scroll (the lists are virtualized). Whe
 4. If it finds nothing, it speaks the original focus. At most **one recovery per second**: it never loops.
 
 It also helps with this: after Alt+Tab, messages lose their names in WhatsApp; the add-on reads the text of the message parts when the name comes back empty.
+
+## What changed in 2.0.8 (WhatsApp Web diagnostics)
+
+Leo's report with 2.0.6 on the Web (31/10/2026): the message menu did not stop at the last option, going back played NVDA's mode switch sound, and after that the chat and the chat list were messed up. The NVDA log showed nothing of that test: the add-on's diagnostics had a 200-line limit per session and it had run out before.
+
+1. The diagnostic limit is now **3000 lines** per NVDA session.
+2. **Every mode switch on the Web** (focus or browse) writes a `modo-trocou` line, with where focus was and whether a menu was open.
+3. An arrow inside a menu that stays with NVDA (browse mode or text field) writes a `menu-seta-do-nvda` line.
+4. Entering and leaving the menu now say the program and the mode.
+
+Nothing changes in use; it is for finding where the Web escapes.
 
 ## What changed in 2.0.7 (reading a message word by word)
 
@@ -265,7 +276,7 @@ whatsapp-unified/
 ```
 python3 -m pytest tests                  # tests with a simulated NVDA
 python3 tests/check_nvda_api.py          # checks every API against the NVDA 2026.2 source
-./build.sh                               # builds whatsAppUnified-2.0.7.nvda-addon
+./build.sh                               # builds whatsAppUnified-2.0.8.nvda-addon
 ```
 
 The stubs in `tests/stubs/` faithfully reproduce the part of `browseMode.py` that decides the mode and plays the sound; the control test proves that, without the add-on, the sound plays over the same focus path.
@@ -282,4 +293,4 @@ This add-on is **GPL version 2** (`COPYING` file). It was born from the union of
 
 The NVDA 2026.2 code (NV Access, GPL-2) was the reference for every API used.
 
-Current version: **2.0.7**.
+Current version: **2.0.8**.

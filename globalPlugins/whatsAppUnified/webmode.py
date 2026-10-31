@@ -227,6 +227,30 @@ class WhatsAppChromeVBuf(ChromeVBuf):
 			return False
 		return super().shouldPassThrough(obj, reason)
 
+	def _set_passThrough(self, state):
+		"""Toda troca de modo feita pelo NVDA (Esc, NVDA+Espaço, foco) passa aqui; só registra.
+
+		As escritas do próprio add-on em ``_passThrough`` são silenciosas de
+		propósito e não passam por aqui.
+		"""
+		if self._wa_pinned and bool(state) != bool(self._passThrough):
+			try:
+				where = diag.describe(api.getFocusObject())
+			except Exception:
+				where = "?"
+			diag.act(
+				"modo-trocou",
+				"para=%s trava=%s esc=%s menu=%s %s" % (
+					"foco" if state else "navegacao",
+					self._wa_lock,
+					self._wa_escaped,
+					menu.active() is not None,
+					where,
+				),
+				key="modo-trocou:%s" % bool(state),
+			)
+		super()._set_passThrough(state)
+
 	def script_disablePassThrough(self, gesture):
 		"""Esc: o nativo do NVDA. Só anota que o modo de navegação veio de um Esc."""
 		if self._wa_pinned and self.passThrough and not self.disableAutoPassThrough:

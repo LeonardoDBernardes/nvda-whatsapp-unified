@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>WhatsApp Unificado 2.0.7</title>
+  <title>WhatsApp Unificado 2.0.8</title>
   <style>
     html {
       color: #1a1a1a;
@@ -166,11 +166,11 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">WhatsApp Unificado 2.0.7</h1>
+<h1 class="title">WhatsApp Unificado 2.0.8</h1>
 </header>
 <h1
-id="whatsapp-unificado-207--acessibilidade-do-whatsapp-para-o-nvda">WhatsApp
-Unificado 2.0.7 — acessibilidade do WhatsApp para o NVDA</h1>
+id="whatsapp-unificado-208--acessibilidade-do-whatsapp-para-o-nvda">WhatsApp
+Unificado 2.0.8 — acessibilidade do WhatsApp para o NVDA</h1>
 <p>Add-on do NVDA para o <strong>WhatsApp Desktop</strong> (o aplicativo
 da Microsoft Store, que usa WebView2) e para o <strong>WhatsApp
 Web</strong> (Chrome, Edge, Brave e outros navegadores baseados em
@@ -388,8 +388,8 @@ opção leva às reações; seta para baixo nas reações volta às opções.</t
 começando com <code>WhatsAppUnificado:</code> sempre que o add-on age:
 sobreposição aplicada, foco adiado ou recuperado, script executado, fala
 filtrada, modo foco fixado ou solto. No máximo uma linha por ação a cada
-2 segundos e 200 linhas por sessão. Nunca grava o texto de mensagens, só
-o papel do objeto e o tamanho do texto.</td>
+2 segundos e 3000 linhas por sessão. Nunca grava o texto de mensagens,
+só o papel do objeto e o tamanho do texto.</td>
 </tr>
 </tbody>
 </table>
@@ -490,6 +490,25 @@ recuperação por segundo</strong>: nunca entra em laço.</li>
 <p>Também ajuda no seguinte: depois do Alt+Tab as mensagens ficam sem
 nome no WhatsApp; o add-on lê o texto das partes da mensagem quando o
 nome vem vazio.</p>
+<h2 id="o-que-mudou-na-208-diagnóstico-do-whatsapp-web">O que mudou na
+2.0.8 (diagnóstico do WhatsApp Web)</h2>
+<p>Relato do Leo com a 2.0.6 no Web (31/10/2026): o menu da mensagem não
+parou na última opção, voltar tocou o som de troca de modo do NVDA e,
+depois disso, a conversa e a lista de conversas ficaram bagunçadas. O
+registro do NVDA não mostrou nada desse teste: o diagnóstico do add-on
+tinha limite de 200 linhas por sessão e esse limite tinha acabado
+antes.</p>
+<ol type="1">
+<li>O limite do diagnóstico passou para <strong>3000 linhas</strong> por
+sessão do NVDA.</li>
+<li><strong>Toda troca de modo no Web</strong> (foco ou navegação) deixa
+uma linha <code>modo-trocou</code>, com o lugar do foco e se o menu
+estava aberto.</li>
+<li>Uma seta dentro de um menu que fica com o NVDA (modo de navegação ou
+campo de texto) deixa uma linha <code>menu-seta-do-nvda</code>.</li>
+<li>A entrada e a saída do menu dizem o programa e o modo.</li>
+</ol>
+<p>Nada muda no uso; serve para achar onde o Web escapa.</p>
 <h2 id="o-que-mudou-na-207-ler-a-mensagem-palavra-por-palavra">O que
 mudou na 2.0.7 (ler a mensagem palavra por palavra)</h2>
 <p>Relato do Leo (31/10/2026): na 1.4, em cima de uma mensagem de texto,
@@ -856,7 +875,7 @@ são toleradas.</p>
 └── build.sh           gera o .nvda-addon</code></pre>
 <pre><code>python3 -m pytest tests                  # testes com o NVDA simulado
 python3 tests/check_nvda_api.py          # confere cada API contra o código-fonte do NVDA 2026.2
-./build.sh                               # gera whatsAppUnified-2.0.7.nvda-addon</code></pre>
+./build.sh                               # gera whatsAppUnified-2.0.8.nvda-addon</code></pre>
 <p>Os stubs de <code>tests/stubs/</code> reproduzem fielmente o trecho
 de <code>browseMode.py</code> que decide o modo e toca o som; o teste de
 controle prova que, sem o add-on, o som toca no mesmo percurso de
@@ -888,6 +907,6 @@ de áudio, documentação em português, a reescrita 2.0.</li>
 </ol>
 <p>O código do NVDA 2026.2 (NV Access, GPL-2) foi a referência de cada
 API usada.</p>
-<p>Versão atual: <strong>2.0.7</strong>.</p>
+<p>Versão atual: <strong>2.0.8</strong>.</p>
 </body>
 </html>

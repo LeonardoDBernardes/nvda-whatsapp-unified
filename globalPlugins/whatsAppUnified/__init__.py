@@ -104,6 +104,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 					return None
 				if self._in_whatsapp() and menu.handles_arrows(focus):
 					return name
+				# Seta num menu que fica com o NVDA (modo de navegação ou campo de
+				# texto): registra, para saber se é por aí que o menu "escapa".
+				diag.act("menu-seta-do-nvda", "%s modo=%s" % (diag.describe(focus), diag.mode_name(focus)))
 				return None
 			if identifier == _MENU_ESCAPE:
 				# Esc num menu do WhatsApp: para o WhatsApp, sem o NVDA trocar de modo.

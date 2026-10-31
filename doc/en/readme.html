@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>WhatsApp Unified 2.0.7</title>
+  <title>WhatsApp Unified 2.0.8</title>
   <style>
     html {
       color: #1a1a1a;
@@ -166,10 +166,10 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">WhatsApp Unified 2.0.7</h1>
+<h1 class="title">WhatsApp Unified 2.0.8</h1>
 </header>
-<h1 id="whatsapp-unified-207--whatsapp-accessibility-for-nvda">WhatsApp
-Unified 2.0.7 — WhatsApp accessibility for NVDA</h1>
+<h1 id="whatsapp-unified-208--whatsapp-accessibility-for-nvda">WhatsApp
+Unified 2.0.8 — WhatsApp accessibility for NVDA</h1>
 <p>NVDA add-on for <strong>WhatsApp Desktop</strong> (the Microsoft
 Store app, which uses WebView2) and for <strong>WhatsApp Web</strong>
 (Chrome, Edge, Brave and other Chromium-based browsers).</p>
@@ -384,7 +384,7 @@ options.</td>
 NVDA log (INFO level, open it with NVDA+F1) whenever the add-on acts:
 overlay applied, focus deferred or recovered, script run, speech
 filtered, focus mode pinned or released. At most one line per action
-every 2 seconds and 200 lines per session. It never records message
+every 2 seconds and 3000 lines per session. It never records message
 text, only the object's role and the text length.</td>
 </tr>
 </tbody>
@@ -485,6 +485,24 @@ normally.</li>
 <p>It also helps with this: after Alt+Tab, messages lose their names in
 WhatsApp; the add-on reads the text of the message parts when the name
 comes back empty.</p>
+<h2 id="what-changed-in-208-whatsapp-web-diagnostics">What changed in
+2.0.8 (WhatsApp Web diagnostics)</h2>
+<p>Leo's report with 2.0.6 on the Web (31/10/2026): the message menu did
+not stop at the last option, going back played NVDA's mode switch sound,
+and after that the chat and the chat list were messed up. The NVDA log
+showed nothing of that test: the add-on's diagnostics had a 200-line
+limit per session and it had run out before.</p>
+<ol type="1">
+<li>The diagnostic limit is now <strong>3000 lines</strong> per NVDA
+session.</li>
+<li><strong>Every mode switch on the Web</strong> (focus or browse)
+writes a <code>modo-trocou</code> line, with where focus was and whether
+a menu was open.</li>
+<li>An arrow inside a menu that stays with NVDA (browse mode or text
+field) writes a <code>menu-seta-do-nvda</code> line.</li>
+<li>Entering and leaving the menu now say the program and the mode.</li>
+</ol>
+<p>Nothing changes in use; it is for finding where the Web escapes.</p>
 <h2 id="what-changed-in-207-reading-a-message-word-by-word">What changed
 in 2.0.7 (reading a message word by word)</h2>
 <p>Leo's report (31/10/2026): in 1.4, on a text message, holding Ctrl
@@ -849,7 +867,7 @@ tolerated.</p>
 └── build.sh           builds the .nvda-addon</code></pre>
 <pre><code>python3 -m pytest tests                  # tests with a simulated NVDA
 python3 tests/check_nvda_api.py          # checks every API against the NVDA 2026.2 source
-./build.sh                               # builds whatsAppUnified-2.0.7.nvda-addon</code></pre>
+./build.sh                               # builds whatsAppUnified-2.0.8.nvda-addon</code></pre>
 <p>The stubs in <code>tests/stubs/</code> faithfully reproduce the part
 of <code>browseMode.py</code> that decides the mode and plays the sound;
 the control test proves that, without the add-on, the sound plays over
@@ -880,6 +898,6 @@ control, Portuguese documentation, the 2.0 rewrite.</li>
 </ol>
 <p>The NVDA 2026.2 code (NV Access, GPL-2) was the reference for every
 API used.</p>
-<p>Current version: <strong>2.0.7</strong>.</p>
+<p>Current version: <strong>2.0.8</strong>.</p>
 </body>
 </html>

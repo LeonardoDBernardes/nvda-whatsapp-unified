@@ -52,14 +52,14 @@ def test_prefix_and_one_line_per_action_every_two_seconds(tick):
 	assert len(lines()) == 3
 
 
-def test_at_most_200_lines_per_session_and_a_single_stop_notice(tick):
-	for index in range(260):
+def test_line_limit_per_session_and_a_single_stop_notice(tick):
+	for index in range(diag.MAX_LINES + 60):
 		tick.t += 3
 		diag.act("overlay", str(index))
 	written = lines()
-	assert len(written) == 201
-	assert "limite de 200 linhas" in written[-1]
-	assert diag.lines_written() == 200
+	assert len(written) == diag.MAX_LINES + 1
+	assert "limite de %d linhas" % diag.MAX_LINES in written[-1]
+	assert diag.lines_written() == diag.MAX_LINES
 
 
 def test_option_off_writes_nothing(tick):

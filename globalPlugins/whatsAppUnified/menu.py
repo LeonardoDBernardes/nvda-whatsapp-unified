@@ -382,7 +382,7 @@ def handle_gain_focus(obj, nextHandler):
 	_Menu.container = container
 	if container is None:
 		if previous is not None:
-			diag.act("menu-saiu", diag.describe(obj))
+			diag.act("menu-saiu", "%s modo=%s" % (diag.describe(obj), diag.mode_name(obj)))
 		_Menu.tray = False
 		_Menu.tray_seen = False
 		_Menu.habit_esc = False
@@ -395,7 +395,7 @@ def handle_gain_focus(obj, nextHandler):
 		_Menu.tray = is_tray(container)
 		diag.act(
 			"menu-entrou",
-			"barra=%s cadeia=%s" % (_Menu.tray, _role_chain(obj)),
+			"barra=%s cadeia=%s %s modo=%s" % (_Menu.tray, _role_chain(obj), diag.describe(obj), diag.mode_name(obj)),
 			key="menu-entrou:%s" % _Menu.tray,
 		)
 	if _Menu.tray:

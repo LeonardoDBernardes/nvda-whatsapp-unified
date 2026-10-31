@@ -1,4 +1,4 @@
-# WhatsApp Unificado 2.0.7 — acessibilidade do WhatsApp para o NVDA
+# WhatsApp Unificado 2.0.8 — acessibilidade do WhatsApp para o NVDA
 
 Add-on do NVDA para o **WhatsApp Desktop** (o aplicativo da Microsoft Store, que usa WebView2) e para o **WhatsApp Web** (Chrome, Edge, Brave e outros navegadores baseados em Chromium).
 
@@ -62,7 +62,7 @@ NVDA → Preferências → Configurações → **WhatsApp Unificado**. Valem na 
 | Manter o modo foco automaticamente no WhatsApp Web, sem som de troca de modo | Sim | Liga a parte descrita na próxima seção. |
 | Recuperar o foco quando o WhatsApp o perde | Sim | Liga a recuperação de foco. |
 | Menu da mensagem começa nas opções (Responder, Copiar), não nas reações | Sim | Ao abrir o menu da mensagem, o foco vai direto para a primeira opção (o add-on usa o Tab do próprio WhatsApp). Seta para cima na primeira opção leva às reações; seta para baixo nas reações volta às opções. |
-| Registrar ações no log do NVDA (diagnóstico) | Sim (nesta versão de teste) | Escreve no log do NVDA (nível INFO, abra com NVDA+F1) uma linha começando com `WhatsAppUnificado:` sempre que o add-on age: sobreposição aplicada, foco adiado ou recuperado, script executado, fala filtrada, modo foco fixado ou solto. No máximo uma linha por ação a cada 2 segundos e 200 linhas por sessão. Nunca grava o texto de mensagens, só o papel do objeto e o tamanho do texto. |
+| Registrar ações no log do NVDA (diagnóstico) | Sim (nesta versão de teste) | Escreve no log do NVDA (nível INFO, abra com NVDA+F1) uma linha começando com `WhatsAppUnificado:` sempre que o add-on age: sobreposição aplicada, foco adiado ou recuperado, script executado, fala filtrada, modo foco fixado ou solto. No máximo uma linha por ação a cada 2 segundos e 3000 linhas por sessão. Nunca grava o texto de mensagens, só o papel do objeto e o tamanho do texto. |
 
 A opção antiga `disableFocusLock` (1.x) foi incorporada em "Manter o modo foco automaticamente". Se ela estava ligada no seu `nvda.ini`, a 2.0 respeita isso até você salvar o painel novo.
 
@@ -107,6 +107,17 @@ O WhatsApp monta e desmonta linhas à medida que você rola (as listas são virt
 4. Se não achar nada, fala o foco original. No máximo **uma recuperação por segundo**: nunca entra em laço.
 
 Também ajuda no seguinte: depois do Alt+Tab as mensagens ficam sem nome no WhatsApp; o add-on lê o texto das partes da mensagem quando o nome vem vazio.
+
+## O que mudou na 2.0.8 (diagnóstico do WhatsApp Web)
+
+Relato do Leo com a 2.0.6 no Web (31/10/2026): o menu da mensagem não parou na última opção, voltar tocou o som de troca de modo do NVDA e, depois disso, a conversa e a lista de conversas ficaram bagunçadas. O registro do NVDA não mostrou nada desse teste: o diagnóstico do add-on tinha limite de 200 linhas por sessão e esse limite tinha acabado antes.
+
+1. O limite do diagnóstico passou para **3000 linhas** por sessão do NVDA.
+2. **Toda troca de modo no Web** (foco ou navegação) deixa uma linha `modo-trocou`, com o lugar do foco e se o menu estava aberto.
+3. Uma seta dentro de um menu que fica com o NVDA (modo de navegação ou campo de texto) deixa uma linha `menu-seta-do-nvda`.
+4. A entrada e a saída do menu dizem o programa e o modo.
+
+Nada muda no uso; serve para achar onde o Web escapa.
 
 ## O que mudou na 2.0.7 (ler a mensagem palavra por palavra)
 
@@ -265,7 +276,7 @@ whatsapp-unified/
 ```
 python3 -m pytest tests                  # testes com o NVDA simulado
 python3 tests/check_nvda_api.py          # confere cada API contra o código-fonte do NVDA 2026.2
-./build.sh                               # gera whatsAppUnified-2.0.7.nvda-addon
+./build.sh                               # gera whatsAppUnified-2.0.8.nvda-addon
 ```
 
 Os stubs de `tests/stubs/` reproduzem fielmente o trecho de `browseMode.py` que decide o modo e toca o som; o teste de controle prova que, sem o add-on, o som toca no mesmo percurso de foco.
@@ -282,4 +293,4 @@ Este add-on é **GPL versão 2** (arquivo `COPYING`). Ele nasceu da união de do
 
 O código do NVDA 2026.2 (NV Access, GPL-2) foi a referência de cada API usada.
 
-Versão atual: **2.0.7**.
+Versão atual: **2.0.8**.
