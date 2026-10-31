@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>WhatsApp Unificado 2.0.6</title>
+  <title>WhatsApp Unificado 2.0.7</title>
   <style>
     html {
       color: #1a1a1a;
@@ -166,11 +166,11 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">WhatsApp Unificado 2.0.6</h1>
+<h1 class="title">WhatsApp Unificado 2.0.7</h1>
 </header>
 <h1
-id="whatsapp-unificado-206--acessibilidade-do-whatsapp-para-o-nvda">WhatsApp
-Unificado 2.0.6 — acessibilidade do WhatsApp para o NVDA</h1>
+id="whatsapp-unificado-207--acessibilidade-do-whatsapp-para-o-nvda">WhatsApp
+Unificado 2.0.7 — acessibilidade do WhatsApp para o NVDA</h1>
 <p>Add-on do NVDA para o <strong>WhatsApp Desktop</strong> (o aplicativo
 da Microsoft Store, que usa WebView2) e para o <strong>WhatsApp
 Web</strong> (Chrome, Edge, Brave e outros navegadores baseados em
@@ -298,6 +298,12 @@ cerca de 1,3 s) e fala.</td>
 <td>O mesmo, mas abre o texto em uma janela de texto comum.</td>
 </tr>
 <tr class="odd">
+<td>Ctrl+Seta direita / Ctrl+Seta esquerda</td>
+<td>Lê a mensagem palavra por palavra (próxima / anterior), sem sair
+dela. Começa da primeira palavra e para na última e na primeira. Em modo
+de navegação vale o Ctrl+setas do próprio NVDA.</td>
+</tr>
+<tr class="even">
 <td>Ctrl+C</td>
 <td>Copia o texto da mensagem e fala "Copiado". Sem texto, ou <strong>se
 você selecionou um trecho</strong>, a tecla segue para o WhatsApp.</td>
@@ -484,6 +490,27 @@ recuperação por segundo</strong>: nunca entra em laço.</li>
 <p>Também ajuda no seguinte: depois do Alt+Tab as mensagens ficam sem
 nome no WhatsApp; o add-on lê o texto das partes da mensagem quando o
 nome vem vazio.</p>
+<h2 id="o-que-mudou-na-207-ler-a-mensagem-palavra-por-palavra">O que
+mudou na 2.0.7 (ler a mensagem palavra por palavra)</h2>
+<p>Relato do Leo (31/10/2026): na 1.4, em cima de uma mensagem de texto,
+dava para ler palavra por palavra segurando o Ctrl e usando as setas
+para os lados; na 2.0 não dava, nem no aplicativo nem no Web.</p>
+<p>Por quê: o aplicativo não tem modo de navegação e o Web fica em modo
+foco nas mensagens, então o Ctrl+setas ia para o WhatsApp, que não faz
+nada com essa tecla numa mensagem (ele só usa Ctrl+setas no tocador de
+áudio, para a velocidade, e o tocador é outro elemento).</p>
+<ol type="1">
+<li><strong>Ctrl+Seta direita</strong> lê a próxima palavra da mensagem
+e <strong>Ctrl+Seta esquerda</strong> a anterior, no aplicativo e no
+Web. A primeira Ctrl+Seta direita lê a primeira palavra; nas pontas a
+palavra se repete, o foco não sai da mensagem. Palavra de uma letra só é
+soletrada.</li>
+<li>Ao ir para outra mensagem, a leitura recomeça do início.</li>
+<li><strong>Sem conflito</strong>: só vale com o foco numa mensagem, em
+modo foco. Em modo de navegação o NVDA pega a tecla antes (palavra do
+documento, como sempre). No campo de digitação o Ctrl+setas continua
+sendo do campo. Mensagem sem texto: a tecla segue para o WhatsApp.</li>
+</ol>
 <h2 id="o-que-mudou-na-206-as-setas-do-menu-voltam-a-ser-do-whatsapp">O
 que mudou na 2.0.6 (as setas do menu voltam a ser do WhatsApp)</h2>
 <p>Relato do Leo com a 2.0.5 (30/10/2026): no aplicativo, descendo pelo
@@ -829,7 +856,7 @@ são toleradas.</p>
 └── build.sh           gera o .nvda-addon</code></pre>
 <pre><code>python3 -m pytest tests                  # testes com o NVDA simulado
 python3 tests/check_nvda_api.py          # confere cada API contra o código-fonte do NVDA 2026.2
-./build.sh                               # gera whatsAppUnified-2.0.6.nvda-addon</code></pre>
+./build.sh                               # gera whatsAppUnified-2.0.7.nvda-addon</code></pre>
 <p>Os stubs de <code>tests/stubs/</code> reproduzem fielmente o trecho
 de <code>browseMode.py</code> que decide o modo e toca o som; o teste de
 controle prova que, sem o add-on, o som toca no mesmo percurso de
@@ -861,6 +888,6 @@ de áudio, documentação em português, a reescrita 2.0.</li>
 </ol>
 <p>O código do NVDA 2026.2 (NV Access, GPL-2) foi a referência de cada
 API usada.</p>
-<p>Versão atual: <strong>2.0.6</strong>.</p>
+<p>Versão atual: <strong>2.0.7</strong>.</p>
 </body>
 </html>

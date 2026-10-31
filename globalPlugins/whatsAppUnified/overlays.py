@@ -10,12 +10,14 @@ Só objetos IAccessible entram aqui: misturar classes IAccessible e UIA gerou
 objetos quebrados na 1.2.x.
 """
 
+import re
 import time
 
 import api
 import controlTypes
 import inputCore
 import oleacc
+import speech
 import textInfos
 import ui
 import winUser
@@ -74,8 +76,27 @@ _MESSAGE_KEYS = {
 		("kb:alt+enter", "browseMessage"),
 		("kb:alt+c", "textWindow"),
 		("kb:control+c", "copyMessage"),
+		("kb:control+rightArrow", "nextWord"),
+		("kb:control+leftArrow", "previousWord"),
 	)
 }
+
+# Palavras da mensagem: qualquer sequência sem espaço (emoji e pontuação incluídos).
+_WORD_RE = re.compile(r"\S+")
+
+
+class _Words:
+	"""Posição da leitura por palavra (2.0.7). Recomeça em outra mensagem ou se o texto muda."""
+
+	message = None
+	text = ""
+	index = -1
+
+
+def _reset_words():
+	_Words.message = None
+	_Words.text = ""
+	_Words.index = -1
 
 
 # Papéis que podem receber as classes de linha: a linha, a célula e o div focável.
@@ -169,6 +190,42 @@ class MessageRow(NVDAObject):
 			ui.message(_("Botão de reação não encontrado"))
 			return
 		button.doAction()
+
+	@script(description=_("Ler próxima palavra da mensagem"))
+	@diag.scripted
+	def script_nextWord(self, gesture):
+		self._speak_word(1, gesture)
+
+	@script(description=_("Ler palavra anterior da mensagem"))
+	@diag.scripted
+	def script_previousWord(self, gesture):
+		self._speak_word(-1, gesture)
+
+	def _speak_word(self, direction, gesture):
+		"""Ctrl+setas laterais: a mensagem palavra por palavra, sem sair dela.
+
+		Relato do Leo (31/10/2026): na 1.4 dava para ler a mensagem palavra por
+		palavra com o Ctrl e as setas; na 2.0 não, no aplicativo (que não tem
+		modo de navegação) e no Web (que fica em modo foco). O WhatsApp só usa
+		Ctrl+setas no tocador de áudio (velocidade), que é outro elemento; no div
+		da mensagem a tecla não fazia nada. Em modo de navegação o buffer do NVDA
+		pega a tecla antes (palavra do documento, nativo). Para nas pontas.
+		"""
+		text = messagetext.message_text(self.wa_row, focus=self)
+		words = _WORD_RE.findall(text)
+		if not words:
+			gesture.send()
+			return
+		if _Words.message is not self or _Words.text != text:
+			_Words.message = self
+			_Words.text = text
+			_Words.index = -1
+		_Words.index = min(max(_Words.index + direction, 0), len(words) - 1)
+		word = words[_Words.index]
+		if len(word) == 1:
+			speech.speakSpelling(word)
+		else:
+			speech.speakText(word)
 
 	@script(description=_("Ler mensagem completa"))
 	@diag.scripted
@@ -274,6 +331,7 @@ def reset_page_memory():
 	"""Solta as referências (chamado ao encerrar o plugin e na recarga)."""
 	_PageMemory.hwnd = 0
 	_PageMemory.last = None
+	_reset_words()
 
 
 def note_page_focus(obj):

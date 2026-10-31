@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>WhatsApp Unified 2.0.6</title>
+  <title>WhatsApp Unified 2.0.7</title>
   <style>
     html {
       color: #1a1a1a;
@@ -166,10 +166,10 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">WhatsApp Unified 2.0.6</h1>
+<h1 class="title">WhatsApp Unified 2.0.7</h1>
 </header>
-<h1 id="whatsapp-unified-206--whatsapp-accessibility-for-nvda">WhatsApp
-Unified 2.0.6 — WhatsApp accessibility for NVDA</h1>
+<h1 id="whatsapp-unified-207--whatsapp-accessibility-for-nvda">WhatsApp
+Unified 2.0.7 — WhatsApp accessibility for NVDA</h1>
 <p>NVDA add-on for <strong>WhatsApp Desktop</strong> (the Microsoft
 Store app, which uses WebView2) and for <strong>WhatsApp Web</strong>
 (Chrome, Edge, Brave and other Chromium-based browsers).</p>
@@ -295,6 +295,12 @@ to about 1.3 s) and speaks it.</td>
 <td>The same, but opens the text in a plain text window.</td>
 </tr>
 <tr class="odd">
+<td>Ctrl+Right arrow / Ctrl+Left arrow</td>
+<td>Reads the message word by word (next / previous) without leaving it.
+Starts at the first word and stops at the last and the first. In browse
+mode NVDA's own Ctrl+arrows apply.</td>
+</tr>
+<tr class="even">
 <td>Ctrl+C</td>
 <td>Copies the message text and says "Copied". With no text, <strong>or
 if you selected a piece of text</strong>, the key goes to WhatsApp.</td>
@@ -479,6 +485,27 @@ normally.</li>
 <p>It also helps with this: after Alt+Tab, messages lose their names in
 WhatsApp; the add-on reads the text of the message parts when the name
 comes back empty.</p>
+<h2 id="what-changed-in-207-reading-a-message-word-by-word">What changed
+in 2.0.7 (reading a message word by word)</h2>
+<p>Leo's report (31/10/2026): in 1.4, on a text message, holding Ctrl
+and using the side arrows read it word by word; in 2.0 that did not
+work, neither in the app nor on the Web.</p>
+<p>Why: the app has no browse mode and the Web stays in focus mode on
+messages, so Ctrl+arrows went to WhatsApp, which does nothing with that
+key on a message (it only uses Ctrl+arrows on the audio player, for
+speed, and the player is another element).</p>
+<ol type="1">
+<li><strong>Ctrl+Right arrow</strong> reads the next word of the message
+and <strong>Ctrl+Left arrow</strong> the previous one, in the app and on
+the Web. The first Ctrl+Right reads the first word; at the ends the word
+repeats and focus does not leave the message. A one-letter word is
+spelled.</li>
+<li>Moving to another message starts again from the beginning.</li>
+<li><strong>No conflict</strong>: it only applies with focus on a
+message, in focus mode. In browse mode NVDA takes the key first
+(document word, as always). In the composer Ctrl+arrows stay the
+field's. A message without text: the key goes to WhatsApp.</li>
+</ol>
 <h2 id="what-changed-in-206-menu-arrows-belong-to-whatsapp-again">What
 changed in 2.0.6 (menu arrows belong to WhatsApp again)</h2>
 <p>Leo's report on 2.0.5 (30/10/2026): in the app, going down the
@@ -822,7 +849,7 @@ tolerated.</p>
 └── build.sh           builds the .nvda-addon</code></pre>
 <pre><code>python3 -m pytest tests                  # tests with a simulated NVDA
 python3 tests/check_nvda_api.py          # checks every API against the NVDA 2026.2 source
-./build.sh                               # builds whatsAppUnified-2.0.6.nvda-addon</code></pre>
+./build.sh                               # builds whatsAppUnified-2.0.7.nvda-addon</code></pre>
 <p>The stubs in <code>tests/stubs/</code> faithfully reproduce the part
 of <code>browseMode.py</code> that decides the mode and plays the sound;
 the control test proves that, without the add-on, the sound plays over
@@ -853,6 +880,6 @@ control, Portuguese documentation, the 2.0 rewrite.</li>
 </ol>
 <p>The NVDA 2026.2 code (NV Access, GPL-2) was the reference for every
 API used.</p>
-<p>Current version: <strong>2.0.6</strong>.</p>
+<p>Current version: <strong>2.0.7</strong>.</p>
 </body>
 </html>

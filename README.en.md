@@ -1,4 +1,4 @@
-# WhatsApp Unified 2.0.6 — WhatsApp accessibility for NVDA
+# WhatsApp Unified 2.0.7 — WhatsApp accessibility for NVDA
 
 NVDA add-on for **WhatsApp Desktop** (the Microsoft Store app, which uses WebView2) and for **WhatsApp Web** (Chrome, Edge, Brave and other Chromium-based browsers).
 
@@ -41,6 +41,7 @@ NVDA add-on for **WhatsApp Desktop** (the Microsoft Store app, which uses WebVie
 | Ctrl+R | Reads the full message. If the text is cut ("... Read more"), it clicks "Read more", waits for the text to grow (checks every 60 ms, up to about 1.3 s) and speaks it. |
 | Alt+Enter | The same, but opens the text in an NVDA browseable window (titled "Message"). |
 | Alt+C | The same, but opens the text in a plain text window. |
+| Ctrl+Right arrow / Ctrl+Left arrow | Reads the message word by word (next / previous) without leaving it. Starts at the first word and stops at the last and the first. In browse mode NVDA's own Ctrl+arrows apply. |
 | Ctrl+C | Copies the message text and says "Copied". With no text, **or if you selected a piece of text**, the key goes to WhatsApp. |
 
 Inside a WhatsApp menu (message menu, reaction bar), in focus mode, up and down arrow walk the options and **Esc goes straight to WhatsApp** (closes the menu, no mode switch sound); see "What changed in 2.0.3". Outside menus, **NVDA+Space** and **Esc** remain NVDA's own (see the focus mode section).
@@ -106,6 +107,16 @@ WhatsApp mounts and unmounts rows as you scroll (the lists are virtualized). Whe
 4. If it finds nothing, it speaks the original focus. At most **one recovery per second**: it never loops.
 
 It also helps with this: after Alt+Tab, messages lose their names in WhatsApp; the add-on reads the text of the message parts when the name comes back empty.
+
+## What changed in 2.0.7 (reading a message word by word)
+
+Leo's report (31/10/2026): in 1.4, on a text message, holding Ctrl and using the side arrows read it word by word; in 2.0 that did not work, neither in the app nor on the Web.
+
+Why: the app has no browse mode and the Web stays in focus mode on messages, so Ctrl+arrows went to WhatsApp, which does nothing with that key on a message (it only uses Ctrl+arrows on the audio player, for speed, and the player is another element).
+
+1. **Ctrl+Right arrow** reads the next word of the message and **Ctrl+Left arrow** the previous one, in the app and on the Web. The first Ctrl+Right reads the first word; at the ends the word repeats and focus does not leave the message. A one-letter word is spelled.
+2. Moving to another message starts again from the beginning.
+3. **No conflict**: it only applies with focus on a message, in focus mode. In browse mode NVDA takes the key first (document word, as always). In the composer Ctrl+arrows stay the field's. A message without text: the key goes to WhatsApp.
 
 ## What changed in 2.0.6 (menu arrows belong to WhatsApp again)
 
@@ -254,7 +265,7 @@ whatsapp-unified/
 ```
 python3 -m pytest tests                  # tests with a simulated NVDA
 python3 tests/check_nvda_api.py          # checks every API against the NVDA 2026.2 source
-./build.sh                               # builds whatsAppUnified-2.0.6.nvda-addon
+./build.sh                               # builds whatsAppUnified-2.0.7.nvda-addon
 ```
 
 The stubs in `tests/stubs/` faithfully reproduce the part of `browseMode.py` that decides the mode and plays the sound; the control test proves that, without the add-on, the sound plays over the same focus path.
@@ -271,4 +282,4 @@ This add-on is **GPL version 2** (`COPYING` file). It was born from the union of
 
 The NVDA 2026.2 code (NV Access, GPL-2) was the reference for every API used.
 
-Current version: **2.0.6**.
+Current version: **2.0.7**.

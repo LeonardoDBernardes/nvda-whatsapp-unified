@@ -1,4 +1,4 @@
-# WhatsApp Unificado 2.0.6 — acessibilidade do WhatsApp para o NVDA
+# WhatsApp Unificado 2.0.7 — acessibilidade do WhatsApp para o NVDA
 
 Add-on do NVDA para o **WhatsApp Desktop** (o aplicativo da Microsoft Store, que usa WebView2) e para o **WhatsApp Web** (Chrome, Edge, Brave e outros navegadores baseados em Chromium).
 
@@ -41,6 +41,7 @@ Add-on do NVDA para o **WhatsApp Desktop** (o aplicativo da Microsoft Store, que
 | Ctrl+R | Lê a mensagem completa. Se o texto está cortado ("... Ler mais"), clica em "Ler mais", espera o texto crescer (confere a cada 60 ms, até cerca de 1,3 s) e fala. |
 | Alt+Enter | O mesmo, mas abre o texto em uma janela de navegação do NVDA (título "Mensagem"). |
 | Alt+C | O mesmo, mas abre o texto em uma janela de texto comum. |
+| Ctrl+Seta direita / Ctrl+Seta esquerda | Lê a mensagem palavra por palavra (próxima / anterior), sem sair dela. Começa da primeira palavra e para na última e na primeira. Em modo de navegação vale o Ctrl+setas do próprio NVDA. |
 | Ctrl+C | Copia o texto da mensagem e fala "Copiado". Sem texto, ou **se você selecionou um trecho**, a tecla segue para o WhatsApp. |
 
 Dentro de um menu do WhatsApp (menu da mensagem, barra de reações), em modo foco, as setas para cima e para baixo andam pelas opções e o **Esc vai direto para o WhatsApp** (fecha o menu, sem o som de troca de modo); veja "O que mudou na 2.0.3". Fora dos menus, **NVDA+Espaço** e **Esc** continuam sendo os do NVDA (veja a seção sobre o modo foco).
@@ -106,6 +107,16 @@ O WhatsApp monta e desmonta linhas à medida que você rola (as listas são virt
 4. Se não achar nada, fala o foco original. No máximo **uma recuperação por segundo**: nunca entra em laço.
 
 Também ajuda no seguinte: depois do Alt+Tab as mensagens ficam sem nome no WhatsApp; o add-on lê o texto das partes da mensagem quando o nome vem vazio.
+
+## O que mudou na 2.0.7 (ler a mensagem palavra por palavra)
+
+Relato do Leo (31/10/2026): na 1.4, em cima de uma mensagem de texto, dava para ler palavra por palavra segurando o Ctrl e usando as setas para os lados; na 2.0 não dava, nem no aplicativo nem no Web.
+
+Por quê: o aplicativo não tem modo de navegação e o Web fica em modo foco nas mensagens, então o Ctrl+setas ia para o WhatsApp, que não faz nada com essa tecla numa mensagem (ele só usa Ctrl+setas no tocador de áudio, para a velocidade, e o tocador é outro elemento).
+
+1. **Ctrl+Seta direita** lê a próxima palavra da mensagem e **Ctrl+Seta esquerda** a anterior, no aplicativo e no Web. A primeira Ctrl+Seta direita lê a primeira palavra; nas pontas a palavra se repete, o foco não sai da mensagem. Palavra de uma letra só é soletrada.
+2. Ao ir para outra mensagem, a leitura recomeça do início.
+3. **Sem conflito**: só vale com o foco numa mensagem, em modo foco. Em modo de navegação o NVDA pega a tecla antes (palavra do documento, como sempre). No campo de digitação o Ctrl+setas continua sendo do campo. Mensagem sem texto: a tecla segue para o WhatsApp.
 
 ## O que mudou na 2.0.6 (as setas do menu voltam a ser do WhatsApp)
 
@@ -254,7 +265,7 @@ whatsapp-unified/
 ```
 python3 -m pytest tests                  # testes com o NVDA simulado
 python3 tests/check_nvda_api.py          # confere cada API contra o código-fonte do NVDA 2026.2
-./build.sh                               # gera whatsAppUnified-2.0.6.nvda-addon
+./build.sh                               # gera whatsAppUnified-2.0.7.nvda-addon
 ```
 
 Os stubs de `tests/stubs/` reproduzem fielmente o trecho de `browseMode.py` que decide o modo e toca o som; o teste de controle prova que, sem o add-on, o som toca no mesmo percurso de foco.
@@ -271,4 +282,4 @@ Este add-on é **GPL versão 2** (arquivo `COPYING`). Ele nasceu da união de do
 
 O código do NVDA 2026.2 (NV Access, GPL-2) foi a referência de cada API usada.
 
-Versão atual: **2.0.6**.
+Versão atual: **2.0.7**.
