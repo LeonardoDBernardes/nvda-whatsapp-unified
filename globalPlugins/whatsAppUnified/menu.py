@@ -556,11 +556,14 @@ def handle_gain_focus(obj, nextHandler):
 		_Menu.tray = is_tray(container)
 		diag.act(
 			"menu-entrou",
-			"barra=%s cadeia=%s %s modo=%s" % (_Menu.tray, _role_chain(obj), diag.describe(obj), diag.mode_name(obj)),
+			"barra=%s cadeia=%s %s modo=%s buffer=%s" % (
+				_Menu.tray, _role_chain(obj), diag.describe(obj), diag.mode_name(obj), diag.buffer_name(obj),
+			),
 			key="menu-entrou:%s" % _Menu.tray,
 		)
 	if _Menu.tray:
 		_Menu.tray_seen = True
+		_note_reaction(obj)
 		if previous is None and settings.get("menuStartOnOptions") and not _is_editable(obj):
 			# Menu recém-aberto na barra de reações: vai às opções pelo Tab do WhatsApp.
 			_Menu.habit_esc = True
@@ -584,6 +587,22 @@ def handle_gain_focus(obj, nextHandler):
 		pass
 	core.callLater(CHECK_DELAY_MS, _check_moved, obj)
 	return True
+
+
+def _note_reaction(obj):
+	"""No Web, registra o nome que a reação em foco tem para o NVDA (só os códigos dos emojis)."""
+	if context.active() != "web":
+		return
+	try:
+		name = obj.name
+	except Exception:
+		name = None
+	symbols = diag.symbols_of(name)
+	diag.act(
+		"reacao",
+		"nome=%s papel=%s modo=%s buffer=%s" % (symbols, diag.role_name(obj), diag.mode_name(obj), diag.buffer_name(obj)),
+		key="reacao:%s" % symbols,
+	)
 
 
 def _tab_from_tray(obj):

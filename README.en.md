@@ -1,4 +1,4 @@
-# WhatsApp Unified 2.0.11 — WhatsApp accessibility for NVDA
+# WhatsApp Unified 2.0.12 — WhatsApp accessibility for NVDA
 
 NVDA add-on for **WhatsApp Desktop** (the Microsoft Store app, which uses WebView2) and for **WhatsApp Web** (Chrome, Edge, Brave and other Chromium-based browsers).
 
@@ -107,6 +107,18 @@ WhatsApp mounts and unmounts rows as you scroll (the lists are virtualized). Whe
 4. If it finds nothing, it speaks the original focus. At most **one recovery per second**: it never loops.
 
 It also helps with this: after Alt+Tab, messages lose their names in WhatsApp; the add-on reads the text of the message parts when the name comes back empty.
+
+## What changed in 2.0.12 (reactions without the NVDA+Space sound on the Web)
+
+Leo's report (31/10/2026): on the Web, with the message menu open, up arrow on the first option goes to the reactions, and at that moment NVDA's mode switch sound played (the same as NVDA+Space). On the reactions NVDA also said "etiqueta" (label) instead of the emojis.
+
+Why (NVDA code): the reaction bar sits in a page **dialog**, and NVDA gives every dialog its own browse mode buffer, separate from the rest of WhatsApp and outside the add-on's control. That buffer starts in browse mode; moving from the options (WhatsApp, focus mode) to the reactions (the other buffer, browse mode) plays the sound. The 2.0.11 log showed the reactions in browse mode with no mode switch in WhatsApp. The app has no such buffer, so it never happens there.
+
+1. **Web only: the dialog that wraps the message menu no longer gets its own browse mode buffer.** The reactions stay in WhatsApp's focus mode, without the sound, as in the app.
+2. Other WhatsApp Web dialogs are unchanged.
+3. With the keep-focus-mode option off, everything is as NVDA does without the add-on.
+4. **"Etiqueta" on the reactions:** the likely cause is that same separate buffer, which read the reactions differently. If it still says "etiqueta", the diagnostics now log the name each reaction has for NVDA, as emoji codes only (`reacao nome=U+1F44D ...`; names with letters never go to the log), and which buffer NVDA used (`buffer=`).
+5. **The app does not change.**
 
 ## What changed in 2.0.11 (the message menu no longer escapes on the Web)
 
@@ -300,7 +312,7 @@ whatsapp-unified/
 ```
 python3 -m pytest tests                  # tests with a simulated NVDA
 python3 tests/check_nvda_api.py          # checks every API against the NVDA 2026.2 source
-./build.sh                               # builds whatsAppUnified-2.0.11.nvda-addon
+./build.sh                               # builds whatsAppUnified-2.0.12.nvda-addon
 ```
 
 The stubs in `tests/stubs/` faithfully reproduce the part of `browseMode.py` that decides the mode and plays the sound; the control test proves that, without the add-on, the sound plays over the same focus path.
@@ -317,4 +329,4 @@ This add-on is **GPL version 2** (`COPYING` file). It was born from the union of
 
 The NVDA 2026.2 code (NV Access, GPL-2) was the reference for every API used.
 
-Current version: **2.0.11**.
+Current version: **2.0.12**.

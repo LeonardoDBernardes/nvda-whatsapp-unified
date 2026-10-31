@@ -39,7 +39,7 @@ from .context import (
 	APP_NAME,
 )
 from .tree import CELL_ROLES, INNER_FOCUS_ROLES, ROW_ROLES, State, is_defunct, row_ancestor, safe_role
-from .webmode import WhatsAppWebDocument
+from .webmode import WhatsAppMenuDialog, WhatsAppWebDocument
 
 addonHandler.initTranslation()
 
@@ -437,6 +437,10 @@ def _choose(obj, clsList, contexts):
 		if is_web_document(obj):
 			clsList.insert(0, WhatsAppWebDocument)
 			_note(WhatsAppWebDocument, obj)
+		elif _is_dialog(obj) and web_overlay_allowed(obj):
+			# Diálogo dentro do WhatsApp Web: o NVDA lhe daria um buffer próprio (webmode.py).
+			clsList.insert(0, WhatsAppMenuDialog)
+			_note(WhatsAppMenuDialog, obj)
 		return
 
 	# Objeto de navegador: só se o foco ATUAL já foi confirmado como
@@ -459,6 +463,13 @@ def _choose(obj, clsList, contexts):
 		if overlay is not None:
 			clsList.insert(0, overlay)
 			_note(overlay, obj)
+
+
+def _is_dialog(obj):
+	try:
+		return obj.IAccessibleRole == oleacc.ROLE_SYSTEM_DIALOG
+	except Exception:
+		return False
 
 
 _upgraded = {}

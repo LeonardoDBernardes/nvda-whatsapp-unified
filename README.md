@@ -1,4 +1,4 @@
-# WhatsApp Unificado 2.0.11 — acessibilidade do WhatsApp para o NVDA
+# WhatsApp Unificado 2.0.12 — acessibilidade do WhatsApp para o NVDA
 
 Add-on do NVDA para o **WhatsApp Desktop** (o aplicativo da Microsoft Store, que usa WebView2) e para o **WhatsApp Web** (Chrome, Edge, Brave e outros navegadores baseados em Chromium).
 
@@ -107,6 +107,18 @@ O WhatsApp monta e desmonta linhas à medida que você rola (as listas são virt
 4. Se não achar nada, fala o foco original. No máximo **uma recuperação por segundo**: nunca entra em laço.
 
 Também ajuda no seguinte: depois do Alt+Tab as mensagens ficam sem nome no WhatsApp; o add-on lê o texto das partes da mensagem quando o nome vem vazio.
+
+## O que mudou na 2.0.12 (reações sem o som do NVDA+Espaço no Web)
+
+Relato do Leo (31/10/2026): no Web, com o menu da mensagem aberto, a seta para cima na primeira opção leva às reações, e nessa hora tocava o som de troca de modo do NVDA (o mesmo do NVDA+Espaço). Nas reações o NVDA também falava "etiqueta" em vez dos emojis.
+
+Por quê (código do NVDA): a barra de reações fica num **diálogo** da página, e o NVDA dá a todo diálogo um modo de navegação próprio, separado do resto do WhatsApp e fora do controle do add-on. Esse modo próprio nasce em modo de navegação; passar das opções (WhatsApp, modo foco) para as reações (o outro, modo de navegação) toca o som. O log da 2.0.11 mostrava as reações em modo de navegação sem nenhuma troca de modo no WhatsApp. No aplicativo não existe esse modo próprio, por isso lá não acontece.
+
+1. **Só no Web: o diálogo que embrulha o menu da mensagem não ganha mais modo de navegação próprio.** As reações ficam no modo foco do WhatsApp, sem som, como no aplicativo.
+2. Os outros diálogos do WhatsApp Web ficam como estavam.
+3. Com a opção de manter o modo foco desligada, tudo fica como o NVDA faz sem o add-on.
+4. **"Etiqueta" nas reações:** a causa provável é o mesmo modo de navegação próprio, que lia as reações de outro jeito. Se ainda falar "etiqueta", o diagnóstico agora registra o nome que cada reação tem para o NVDA, só em códigos de emoji (`reacao nome=U+1F44D ...`; nome com letras não vai para o log), e qual modo de navegação o NVDA usou (`buffer=`).
+5. **O aplicativo não muda.**
 
 ## O que mudou na 2.0.11 (menu da mensagem não foge mais no Web)
 
@@ -300,7 +312,7 @@ whatsapp-unified/
 ```
 python3 -m pytest tests                  # testes com o NVDA simulado
 python3 tests/check_nvda_api.py          # confere cada API contra o código-fonte do NVDA 2026.2
-./build.sh                               # gera whatsAppUnified-2.0.11.nvda-addon
+./build.sh                               # gera whatsAppUnified-2.0.12.nvda-addon
 ```
 
 Os stubs de `tests/stubs/` reproduzem fielmente o trecho de `browseMode.py` que decide o modo e toca o som; o teste de controle prova que, sem o add-on, o som toca no mesmo percurso de foco.
@@ -317,4 +329,4 @@ Este add-on é **GPL versão 2** (arquivo `COPYING`). Ele nasceu da união de do
 
 O código do NVDA 2026.2 (NV Access, GPL-2) foi a referência de cada API usada.
 
-Versão atual: **2.0.11**.
+Versão atual: **2.0.12**.

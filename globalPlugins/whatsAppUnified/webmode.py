@@ -48,6 +48,18 @@ O QUE CONTINUA NATIVO:
   Se o mesmo buffer navegar para outro endereço, o veredito é refeito e o modo
   foco fixo é solto.
 
+DIÁLOGO DO MENU DA MENSAGEM (2.0.12): relato do Leo (31/10/2026), "seta para
+cima" na primeira opção leva à barra de reações e toca o som do NVDA+Espaço. A
+barra fica num DIÁLOGO da página, e o NVDA (ia2Web.findExtraOverlayClasses) dá
+a todo diálogo a classe de documento: ele ganha um buffer PRÓPRIO, um
+ChromeVBuf comum fora do controle do add-on, que nasce em modo de navegação
+(botão = modo de navegação). Passar das opções (buffer do WhatsApp, modo foco)
+para a barra (outro buffer, modo de navegação) toca o som; o log da 2.0.11
+mostra ``modo=navegacao`` na barra sem nenhuma troca de modo no buffer do
+WhatsApp. ``WhatsAppMenuDialog`` não deixa o diálogo que embrulha um menu
+criar buffer: a barra fica no buffer do WhatsApp (ou sem buffer, como no
+aplicativo) e o modo foco segue sem som. Outros diálogos ficam como estão.
+
 LIMITES (documentados no README): vale para o Chromium com IAccessible2, que é o
 padrão do NVDA (``allowInChromium = 0``). Se o usuário ligou UI Automation para
 navegadores baseados em Chromium, o buffer não é um ChromeVBuf e nada aqui roda.
@@ -64,6 +76,7 @@ from NVDAObjects.IAccessible.chromium import ChromeVBuf
 
 from . import diag, menu, settings
 from .context import is_web_document, ti_verdict
+from .tree import iter_children, safe_role
 
 
 class _Entry:
@@ -296,3 +309,26 @@ class WhatsAppWebDocument(chromium.Document):
 		if cls is ChromeVBuf and settings.scope_allows("web") and is_web_document(self):
 			return WhatsAppChromeVBuf
 		return cls
+
+
+# Quantos filhos do diálogo olhar à procura do menu (a barra de reações é o primeiro).
+DIALOG_CHILDREN = 4
+
+
+def wraps_menu(dialog):
+	"""O diálogo embrulha um menu do WhatsApp (a barra de reações da mensagem)?"""
+	return any(safe_role(child) in menu.MENU_ROLES for child in iter_children(dialog, DIALOG_CHILDREN))
+
+
+class WhatsAppMenuDialog(chromium.Document):
+	"""Diálogo do WhatsApp Web que embrulha um menu: sem buffer próprio (2.0.12, ver o topo).
+
+	Só a sobreposição é escolhida na criação do objeto; a pergunta "embrulha um
+	menu?" e as opções são conferidas na hora em que o NVDA quer criar o buffer.
+	"""
+
+	def _get_shouldCreateTreeInterceptor(self):
+		if settings.scope_allows("web") and settings.get("autoFocusMode") and wraps_menu(self):
+			diag.act("dialogo-sem-buffer", diag.describe(self), key="dialogo-sem-buffer")
+			return False
+		return super().shouldCreateTreeInterceptor

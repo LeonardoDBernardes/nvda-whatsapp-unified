@@ -1,6 +1,7 @@
 """Stub de chromium.py: Document escolhe o ChromeVBuf; ChromeVBuf le o endereco como o NVDA (accValue(0))."""
 
 import browseMode
+from controlTypes import State
 from NVDAObjects.IAccessible import IAccessible
 
 
@@ -18,3 +19,6 @@ class ChromeVBuf(browseMode.BrowseModeDocumentTreeInterceptor):
 class Document(IAccessible):
 	def _get_treeInterceptorClass(self):
 		return ChromeVBuf
+
+	def _get_shouldCreateTreeInterceptor(self):  # ia2Web.Document: documento so de leitura
+		return State.READONLY in self.states

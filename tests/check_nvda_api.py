@@ -46,6 +46,7 @@ INSTANCE_ATTRS = {
 		"value", "setFocus", "doAction", "reportFocus", "activeChild", "focusRedirect",
 		"IA2Attributes", "event_gainFocus", "windowHandle",
 		"shouldAllowIAccessibleMenuStartEvent", "treeInterceptorClass", "getScript",
+		"shouldCreateTreeInterceptor",
 	],
 	("NVDAObjects.IAccessible.chromium", "ChromeVBuf"): [
 		"rootNVDAObject", "documentConstantIdentifier", "documentURL", "passThrough",
@@ -80,6 +81,10 @@ HOOKS = [
 	("virtualBuffers/MSHTML.py", "_passThrough = True",
 	 "precedente do NVDA: _passThrough/_disableAutoPassThrough fixados no construtor"),
 	("virtualBuffers/MSHTML.py", "disableAutoPassThrough = True", "idem (MSHTML)"),
+	("NVDAObjects/IAccessible/ia2Web.py", "iaRole in (oleacc.ROLE_SYSTEM_APPLICATION, oleacc.ROLE_SYSTEM_DIALOG) or (",
+	 "todo diálogo web ganha a classe de documento (WhatsAppMenuDialog)"),
+	("treeInterceptorHandler.py", "if not obj.shouldCreateTreeInterceptor and not force:",
+	 "WhatsAppMenuDialog.shouldCreateTreeInterceptor = False impede o buffer próprio"),
 ]
 
 # Variaveis de modulo que o NVDA preenche em tempo de execucao (valem None no codigo-fonte):

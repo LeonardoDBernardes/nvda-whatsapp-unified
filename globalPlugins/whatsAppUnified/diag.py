@@ -108,6 +108,24 @@ def mode_name(obj):
 		return "?"
 
 
+def buffer_name(obj):
+	"""Classe do buffer (tree interceptor) do objeto, ou ``nenhum``: diz QUAL buffer o NVDA usa."""
+	try:
+		holder = obj.treeInterceptor
+	except Exception:
+		return "?"
+	return type(holder).__name__ if holder is not None else "nenhum"
+
+
+def symbols_of(text):
+	"""Código de cada caractere de um texto SÓ de símbolos (emoji); texto com letras ou números não é registrado."""
+	if not text:
+		return "vazio"
+	if any(ch.isalnum() for ch in text):
+		return "texto(%d)" % len(text)
+	return " ".join("U+%04X" % ord(ch) for ch in text[:12])
+
+
 def describe(obj):
 	"""``programa/papel`` do objeto, para as linhas de diagnóstico."""
 	from .context import app_name_of
