@@ -312,7 +312,7 @@ def test_menu_focus_in_browse_mode_goes_back_to_focus_mode_in_the_web(plugin):
 	ti = WhatsAppChromeVBuf(page.doc)
 	page.attach(ti)
 	start_on_message(plugin, page)
-	ti.script_disablePassThrough(Gesture("escape"))  # Esc fora do menu: modo de navegacao
+	browseMode.toggle_pass_through(ti)  # NVDA+Espaco fora do menu: modo de navegacao
 	assert ti.passThrough is False
 	bar, reactions, options_menu, items = open_real_menu(page)
 	page.attach(ti)

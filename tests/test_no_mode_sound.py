@@ -118,19 +118,33 @@ def test_returning_to_whatsapp_after_another_document_stays_silent():
 	assert browseMode.sounds == []
 
 
-def test_escape_is_native_and_goes_to_browse_mode_like_nvda():
-	"""Relato do Leo (30/10): na 1.4, Espaco e depois Esc abria o menu da mensagem em modo de navegacao."""
+def test_escape_goes_to_whatsapp_like_the_app_without_sound():
+	"""2.0.9, relato do Leo (31/10): no Web o Esc trocava para o modo de navegacao (som) e o
+	Esc seguinte baguncava a conversa; no aplicativo o Esc volta para a lista de conversas."""
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
 	page.attach(ti)
 	enter(ti, page)
-	focus(page.msg_rows[0].lastChild)  # botao "Menu" da mensagem
+	focus(page.msg_rows[0])
 	gesture = Gesture("escape")
 	ti.script_disablePassThrough(gesture)
-	assert gesture.sent == 0
-	assert ti.passThrough is False
-	assert ti._wa_lock is False
-	assert browseMode.sounds == ["browseMode.wav"]  # o som nativo, de proposito
+	assert gesture.sent == 1  # foi para o WhatsApp
+	assert ti.passThrough is True and ti._wa_lock is True
+	assert browseMode.sounds == []
+
+
+def test_escape_in_browse_mode_chosen_with_nvda_space_is_nvda_own():
+	page = Page()
+	ti = WhatsAppChromeVBuf(page.doc)
+	page.attach(ti)
+	enter(ti, page)
+	focus(page.msg_rows[0])
+	browseMode.toggle_pass_through(ti)  # NVDA+Espaco: modo de navegacao
+	ti.shouldPassThrough(page.msg_rows[0], OutputReason.FOCUS)
+	gesture = Gesture("escape")
+	ti.script_disablePassThrough(gesture)
+	assert ti.passThrough is False  # continua em modo de navegacao
+	assert gesture.sent == 1  # o nativo do NVDA em modo de navegacao: a tecla segue para a pagina
 
 
 def test_escape_on_a_menu_item_goes_to_the_page_to_close_the_menu():
@@ -148,22 +162,21 @@ def test_escape_on_a_menu_item_goes_to_the_page_to_close_the_menu():
 	assert browseMode.sounds == []
 
 
-def test_after_escape_the_lock_comes_back_on_the_composer_or_a_message():
+def test_after_nvda_space_the_lock_comes_back_on_the_composer_only():
 	page = Page()
 	ti = WhatsAppChromeVBuf(page.doc)
 	page.attach(ti)
 	enter(ti, page)
-	ti.script_disablePassThrough(Gesture("escape"))
+	focus(page.msg_rows[0])
+	browseMode.toggle_pass_through(ti)  # NVDA+Espaco: modo de navegacao escolhido
 	assert ti.passThrough is False
-	browseMode.sounds.clear()
-	ti.event_gainFocus(page.composer, lambda: None)
-	assert ti.passThrough is True and ti._wa_lock is True
-	ti.script_disablePassThrough(Gesture("escape"))
-	browseMode.sounds.clear()
 	row = page.msg_rows[1]
 	apply_overlays(row, {"web"})
 	focus(row)
 	ti.event_gainFocus(row, lambda: None)
+	assert ti.passThrough is False  # numa mensagem a escolha do usuario fica
+	focus(page.composer)
+	ti.event_gainFocus(page.composer, lambda: None)
 	assert ti.passThrough is True and ti._wa_lock is True
 
 

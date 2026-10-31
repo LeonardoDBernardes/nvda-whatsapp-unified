@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>WhatsApp Unificado 2.0.8</title>
+  <title>WhatsApp Unificado 2.0.9</title>
   <style>
     html {
       color: #1a1a1a;
@@ -166,11 +166,11 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">WhatsApp Unificado 2.0.8</h1>
+<h1 class="title">WhatsApp Unificado 2.0.9</h1>
 </header>
 <h1
-id="whatsapp-unificado-208--acessibilidade-do-whatsapp-para-o-nvda">WhatsApp
-Unificado 2.0.8 — acessibilidade do WhatsApp para o NVDA</h1>
+id="whatsapp-unificado-209--acessibilidade-do-whatsapp-para-o-nvda">WhatsApp
+Unificado 2.0.9 — acessibilidade do WhatsApp para o NVDA</h1>
 <p>Add-on do NVDA para o <strong>WhatsApp Desktop</strong> (o aplicativo
 da Microsoft Store, que usa WebView2) e para o <strong>WhatsApp
 Web</strong> (Chrome, Edge, Brave e outros navegadores baseados em
@@ -313,9 +313,11 @@ você selecionou um trecho</strong>, a tecla segue para o WhatsApp.</td>
 <p>Dentro de um menu do WhatsApp (menu da mensagem, barra de reações),
 em modo foco, as setas para cima e para baixo andam pelas opções e o
 <strong>Esc vai direto para o WhatsApp</strong> (fecha o menu, sem o som
-de troca de modo); veja "O que mudou na 2.0.3". Fora dos menus,
-<strong>NVDA+Espaço</strong> e <strong>Esc</strong> continuam sendo os
-do NVDA (veja a seção sobre o modo foco).</p>
+de troca de modo); veja "O que mudou na 2.0.3". Fora dos menus, o
+<strong>Esc</strong> vai para o WhatsApp no Web e no aplicativo (desde a
+2.0.9; por exemplo, numa mensagem volta para a lista de conversas) e o
+<strong>NVDA+Espaço</strong> continua sendo o do NVDA (veja a seção
+sobre o modo foco).</p>
 <p>O NVDA+Shift+H foi conferido contra os comandos do NVDA 2026.2 e está
 livre. O NVDA+Shift+I deixou de ser usado: no NVDA 2026.2 ele é o filtro
 de cor do ampliador.</p>
@@ -446,15 +448,16 @@ som</strong>, porque é uma escolha sua. Se você sai do modo foco, o
 add-on respeita: linhas e botões não puxam o modo foco de volta; só o
 campo de digitação, como o NVDA já faz. Apertando NVDA+Espaço de novo,
 volta o modo foco fixo.</li>
-<li><strong>Esc</strong> fora dos menus é o do NVDA, como na 1.4: em
-modo foco ele passa para o modo de navegação (com o som); um segundo Esc
-vai para o WhatsApp. <strong>Dentro de um menu do WhatsApp</strong>
-(menu da mensagem, barra de reações) o Esc vai direto para o WhatsApp e
-fecha o menu, sem som e sem modo de navegação (2.0.3), no Web e no
-aplicativo. Depois de um Esc, o modo foco fixo volta sozinho quando o
-foco chega ao campo de digitação, a uma conversa, a uma mensagem ou a um
-menu do WhatsApp. (Na 2.0.0 e 2.0.1 o Esc ia direto para o WhatsApp, e
-isso quebrou o "Espaço e depois Esc" do menu da mensagem.)</li>
+<li><strong>Esc</strong> em modo foco vai para o WhatsApp, como no
+aplicativo (2.0.9): sem som e sem modo de navegação. Numa mensagem,
+volta para a lista de conversas. <strong>Dentro de um menu do
+WhatsApp</strong> (menu da mensagem, barra de reações) o plugin pega o
+Esc antes (2.0.3); o Esc de costume logo depois de abrir o menu ("Espaço
+e depois Esc") só repete a opção e o seguinte fecha o menu (2.0.4). Na
+2.0.0 e 2.0.1 o Esc também ia para o WhatsApp e quebrou esse costume,
+porque ainda não havia o tratamento do menu; da 2.0.2 à 2.0.8 o Esc fora
+dos menus foi o do NVDA (modo de navegação, com o som). Para o modo de
+navegação, use NVDA+Espaço; nele o Esc é o do NVDA.</li>
 <li><strong>Outros sites</strong> nunca são afetados: o buffer do add-on
 só entra quando o endereço é do WhatsApp.</li>
 </ul>
@@ -490,6 +493,28 @@ recuperação por segundo</strong>: nunca entra em laço.</li>
 <p>Também ajuda no seguinte: depois do Alt+Tab as mensagens ficam sem
 nome no WhatsApp; o add-on lê o texto das partes da mensagem quando o
 nome vem vazio.</p>
+<h2 id="o-que-mudou-na-209-esc-no-web-igual-ao-aplicativo">O que mudou
+na 2.0.9 (Esc no Web igual ao aplicativo)</h2>
+<p>Relato do Leo (31/10/2026): no Web, ao voltar de uma conversa com o
+Esc, tocava o som de troca de modo do NVDA; usando o Esc de novo, o
+histórico de mensagens ficava bagunçado e desalinhado, e sair para a
+lista de conversas também ficava quebrado. No aplicativo estava
+certo.</p>
+<p>Por quê: no aplicativo o Esc numa mensagem vai para o WhatsApp, que
+volta para a lista de conversas. No Web o add-on deixava esse Esc com o
+NVDA, que passava para o modo de navegação (o som); o Esc seguinte, já
+em modo de navegação, ia para a página.</p>
+<ol type="1">
+<li><strong>No Web o Esc em modo foco vai para o WhatsApp</strong>, como
+no aplicativo: sem som e sem trocar de modo.</li>
+<li>O Esc dentro do menu da mensagem continua igual (o de costume repete
+a opção, o seguinte fecha).</li>
+<li>O modo de navegação continua no <strong>NVDA+Espaço</strong>; para
+ler uma mensagem palavra por palavra não precisa mais dele (Ctrl+setas,
+2.0.7).</li>
+<li><strong>O aplicativo não muda</strong>: a mudança é só no buffer do
+Web.</li>
+</ol>
 <h2 id="o-que-mudou-na-208-diagnóstico-do-whatsapp-web">O que mudou na
 2.0.8 (diagnóstico do WhatsApp Web)</h2>
 <p>Relato do Leo com a 2.0.6 no Web (31/10/2026): o menu da mensagem não
@@ -875,7 +900,7 @@ são toleradas.</p>
 └── build.sh           gera o .nvda-addon</code></pre>
 <pre><code>python3 -m pytest tests                  # testes com o NVDA simulado
 python3 tests/check_nvda_api.py          # confere cada API contra o código-fonte do NVDA 2026.2
-./build.sh                               # gera whatsAppUnified-2.0.8.nvda-addon</code></pre>
+./build.sh                               # gera whatsAppUnified-2.0.9.nvda-addon</code></pre>
 <p>Os stubs de <code>tests/stubs/</code> reproduzem fielmente o trecho
 de <code>browseMode.py</code> que decide o modo e toca o som; o teste de
 controle prova que, sem o add-on, o som toca no mesmo percurso de
@@ -907,6 +932,6 @@ de áudio, documentação em português, a reescrita 2.0.</li>
 </ol>
 <p>O código do NVDA 2026.2 (NV Access, GPL-2) foi a referência de cada
 API usada.</p>
-<p>Versão atual: <strong>2.0.8</strong>.</p>
+<p>Versão atual: <strong>2.0.9</strong>.</p>
 </body>
 </html>

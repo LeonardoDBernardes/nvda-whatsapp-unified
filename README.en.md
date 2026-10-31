@@ -1,4 +1,4 @@
-# WhatsApp Unified 2.0.8 — WhatsApp accessibility for NVDA
+# WhatsApp Unified 2.0.9 — WhatsApp accessibility for NVDA
 
 NVDA add-on for **WhatsApp Desktop** (the Microsoft Store app, which uses WebView2) and for **WhatsApp Web** (Chrome, Edge, Brave and other Chromium-based browsers).
 
@@ -44,7 +44,7 @@ NVDA add-on for **WhatsApp Desktop** (the Microsoft Store app, which uses WebVie
 | Ctrl+Right arrow / Ctrl+Left arrow | Reads the message word by word (next / previous) without leaving it. Starts at the first word and stops at the last and the first. In browse mode NVDA's own Ctrl+arrows apply. |
 | Ctrl+C | Copies the message text and says "Copied". With no text, **or if you selected a piece of text**, the key goes to WhatsApp. |
 
-Inside a WhatsApp menu (message menu, reaction bar), in focus mode, up and down arrow walk the options and **Esc goes straight to WhatsApp** (closes the menu, no mode switch sound); see "What changed in 2.0.3". Outside menus, **NVDA+Space** and **Esc** remain NVDA's own (see the focus mode section).
+Inside a WhatsApp menu (message menu, reaction bar), in focus mode, up and down arrow walk the options and **Esc goes straight to WhatsApp** (closes the menu, no mode switch sound); see "What changed in 2.0.3". Outside menus, **Esc** goes to WhatsApp on the Web and in the app (since 2.0.9; on a message, for example, it returns to the chat list) and **NVDA+Space** remains NVDA's own (see the focus mode section).
 
 NVDA+Shift+H was checked against the NVDA 2026.2 commands and is free. NVDA+Shift+I is no longer used: in NVDA 2026.2 it is the magnifier color filter.
 
@@ -89,7 +89,7 @@ A buffer class of its own (`WhatsAppChromeVBuf`, derived from the Chromium one) 
 ### What stays native
 
 - **NVDA+Space** remains NVDA's and **plays the sound**, because it is your deliberate choice. If you leave focus mode, the add-on respects it: rows and buttons do not pull focus mode back; only the composer does, as NVDA already does. Pressing NVDA+Space again returns to the pinned focus mode.
-- **Esc** outside menus is NVDA's, as in 1.4: in focus mode it switches to browse mode (with the sound); a second Esc goes to WhatsApp. **Inside a WhatsApp menu** (message menu, reaction bar) Esc goes straight to WhatsApp and closes the menu, with no sound and no browse mode (2.0.3), on the Web and in the app. After an Esc, the pinned focus mode comes back by itself when focus reaches the message field, a chat, a message or a WhatsApp menu. (In 2.0.0 and 2.0.1 Esc went straight to WhatsApp, which broke the "Space then Esc" on the message menu.)
+- **Esc** in focus mode goes to WhatsApp, as in the app (2.0.9): no sound and no browse mode. On a message it returns to the chat list. **Inside a WhatsApp menu** (message menu, reaction bar) the plugin takes Esc first (2.0.3); the habit Esc right after opening the menu ("Space then Esc") only repeats the option and the next one closes the menu (2.0.4). In 2.0.0 and 2.0.1 Esc also went to WhatsApp and broke that habit, because the menu handling did not exist yet; from 2.0.2 to 2.0.8 Esc outside menus was NVDA's (browse mode, with the sound). For browse mode, use NVDA+Space; there Esc is NVDA's.
 - **Other sites** are never affected: the add-on's buffer is only used when the address is WhatsApp's.
 
 ### Limits
@@ -107,6 +107,17 @@ WhatsApp mounts and unmounts rows as you scroll (the lists are virtualized). Whe
 4. If it finds nothing, it speaks the original focus. At most **one recovery per second**: it never loops.
 
 It also helps with this: after Alt+Tab, messages lose their names in WhatsApp; the add-on reads the text of the message parts when the name comes back empty.
+
+## What changed in 2.0.9 (Esc on the Web like the app)
+
+Leo's report (31/10/2026): on the Web, going back from a chat with Esc played NVDA's mode switch sound; pressing Esc again left the message history messed up and misaligned, and leaving to the chat list was broken too. The app was fine.
+
+Why: in the app, Esc on a message goes to WhatsApp, which returns to the chat list. On the Web the add-on left that Esc to NVDA, which switched to browse mode (the sound); the next Esc, already in browse mode, went to the page.
+
+1. **On the Web, Esc in focus mode goes to WhatsApp**, as in the app: no sound and no mode switch.
+2. Esc inside the message menu is unchanged (the habit one repeats the option, the next one closes).
+3. Browse mode is still on **NVDA+Space**; reading a message word by word no longer needs it (Ctrl+arrows, 2.0.7).
+4. **The app does not change**: the change is only in the Web buffer.
 
 ## What changed in 2.0.8 (WhatsApp Web diagnostics)
 
@@ -276,7 +287,7 @@ whatsapp-unified/
 ```
 python3 -m pytest tests                  # tests with a simulated NVDA
 python3 tests/check_nvda_api.py          # checks every API against the NVDA 2026.2 source
-./build.sh                               # builds whatsAppUnified-2.0.8.nvda-addon
+./build.sh                               # builds whatsAppUnified-2.0.9.nvda-addon
 ```
 
 The stubs in `tests/stubs/` faithfully reproduce the part of `browseMode.py` that decides the mode and plays the sound; the control test proves that, without the add-on, the sound plays over the same focus path.
@@ -293,4 +304,4 @@ This add-on is **GPL version 2** (`COPYING` file). It was born from the union of
 
 The NVDA 2026.2 code (NV Access, GPL-2) was the reference for every API used.
 
-Current version: **2.0.8**.
+Current version: **2.0.9**.
